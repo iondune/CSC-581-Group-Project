@@ -1,0 +1,234 @@
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>SLO Temperatures</title>
+    <style>
+      html, body, #map-div {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+    </style>
+
+    <script>
+        var map;
+        var canvasLayer;
+        var gl;
+
+        var pointProgram;
+        var pointArrayBuffer;
+
+        var pixelsToWebGLMatrix = new Float32Array(16);
+        var mapMatrix = new Float32Array(16);
+
+        function init() {
+        
+            // initialize the map
+            var mapOptions = {
+              zoom: 12,
+              //39.3, -8.8
+              center: new google.maps.LatLng(35.29, -120.67),
+              mapTypeId: google.maps.MapTypeId.ROADMAP
+            };
+            var mapDiv = document.getElementById('map-div');
+            map = new google.maps.Map(mapDiv, mapOptions);
+            
+            noty({id: 'loading', text: "Loading Points (about 8MB). Please wait...", layout: 'topCenter'});
+            
+            $.getScript('http://localhost:8000/SLOPoints.js',function(){         
+                // initialize the canvasLayer
+                var canvasLayerOptions = {
+                  map: map,
+                  resizeHandler: resize,
+                  animate: false,
+                  updateHandler: update
+                };
+                canvasLayer = new CanvasLayer(canvasLayerOptions);
+
+                // initialize WebGL
+                gl = canvasLayer.canvas.getContext('experimental-webgl');
+            
+                createShaderProgram();
+                loadData();
+                
+                $.noty.close('loading');
+                
+                update();
+            });
+        }
+
+        function createShaderProgram() {
+            // create vertex shader
+            var vertexSrc = document.getElementById('pointVertexShader').text;
+            var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vertexSrc);
+            gl.compileShader(vertexShader);
+
+            // create fragment shader
+            var fragmentSrc = document.getElementById('pointFragmentShader').text;
+            var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fragmentSrc);
+            gl.compileShader(fragmentShader);
+
+            // link shaders to create our program
+            pointProgram = gl.createProgram();
+            gl.attachShader(pointProgram, vertexShader);
+            gl.attachShader(pointProgram, fragmentShader);
+            gl.linkProgram(pointProgram);
+
+            gl.useProgram(pointProgram);
+
+            gl.aPointSize = gl.getAttribLocation(pointProgram, "aPointSize");
+        }
+
+        function loadData() {
+
+            //Custom Load
+            var rawData = new Float32Array(3 * points.length);
+            for (var i = 0; i < points.length; i++) {
+
+                var pixel = LatLongToPixelXY(points[i].lat, points[i].lon);
+                rawData[i * 3] = pixel.x ;
+                rawData[i * 3 + 1] = pixel.y;
+                rawData[i * 3 + 2] = points[i].temp;
+            }
+
+            // create webgl buffer, bind it, and load rawData into it
+            pointArrayBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, pointArrayBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
+
+            // enable the 'worldCoord' attribute in the shader to receive buffer
+            var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
+            gl.enableVertexAttribArray(attributeLoc);
+
+            // tell webgl how buffer is laid out (pairs of x,y coords)
+            gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
+
+        }
+
+        function resize() {
+            var width = canvasLayer.canvas.width;
+            var height = canvasLayer.canvas.height;
+
+            gl.viewport(0, 0, width, height);
+
+            // matrix which maps pixel coordinates to WebGL coordinates
+            pixelsToWebGLMatrix.set([2/width, 0, 0, 0, 0, -2/height, 0, 0, 0, 0, 0, 0, -1, 1, 0, 1]);
+        }
+
+        function scaleMatrix(matrix, scaleX, scaleY) {
+            // scaling x and y, which is just scaling first two columns of matrix
+            matrix[0] *= scaleX;
+            matrix[1] *= scaleX;
+            matrix[2] *= scaleX;
+            matrix[3] *= scaleX;
+
+            matrix[4] *= scaleY;
+            matrix[5] *= scaleY;
+            matrix[6] *= scaleY;
+            matrix[7] *= scaleY;
+        }
+
+        function translateMatrix(matrix, tx, ty) {
+            // translation is in last column of matrix
+            matrix[12] += matrix[0]*tx + matrix[4]*ty;
+            matrix[13] += matrix[1]*tx + matrix[5]*ty;
+            matrix[14] += matrix[2]*tx + matrix[6]*ty;
+            matrix[15] += matrix[3]*tx + matrix[7]*ty;
+        }
+
+        function update() {
+
+            if(points == undefined) return;
+    
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            var currentZoom = map.zoom;
+
+            var pointSize = Math.max(currentZoom - 6.0, 1.0);
+
+
+            gl.vertexAttrib1f(gl.aPointSize, pointSize);
+
+            var mapProjection = map.getProjection();
+
+            /**
+             * We need to create a transformation that takes world coordinate
+             * points in the pointArrayBuffer to the coodinates WebGL expects.
+             * 1. Start with second half in pixelsToWebGLMatrix, which takes pixel
+             *     coordinates to WebGL coordinates.
+             * 2. Scale and translate to take world coordinates to pixel coords
+             * see https://developers.google.com/maps/documentation/javascript/maptypes#MapCoordinate
+             */
+
+            // copy pixel->webgl matrix
+            mapMatrix.set(pixelsToWebGLMatrix);
+
+            // Scale to current zoom (worldCoords * 2^zoom)
+            var scale = Math.pow(2, map.zoom);
+            scaleMatrix(mapMatrix, scale, scale);
+
+            // translate to current view (vector from topLeft to 0,0)
+            var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
+            translateMatrix(mapMatrix, -offset.x, -offset.y);
+
+            // attach matrix value to 'mapMatrix' uniform in shader
+            var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
+            gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
+
+            // draw!
+            gl.drawArrays(gl.POINTS, 0, points.length);
+
+        }
+
+    </script>
+
+    <script id="pointVertexShader" type="x-shader/x-vertex">
+        attribute vec4 worldCoord;
+        attribute float aPointSize;
+        uniform mat4 mapMatrix;
+
+        varying float temperature;
+
+        void main() {
+            // transform world coordinate by matrix uniform variable
+            gl_Position = mapMatrix * worldCoord;
+            temperature = worldCoord.z;
+            gl_PointSize = aPointSize;
+        }
+    </script>
+    <script id="pointFragmentShader" type="x-shader/x-fragment">
+        precision mediump float;
+        varying float temperature;
+
+        //alert(temperature);
+        void main() {
+            gl_FragColor = vec4(temperature / 100.0, 0.0, 1.0 / (temperature / 10.0), 0.3);
+        }
+    </script>
+  </head>
+
+  <body>
+    <div id="map-div"></div>
+    
+    
+    <script src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+    
+    <script src="js/CanvasLayer.js"></script>
+    <script src="js/Utils.js"></script>
+    <script src="js/noty/jquery.noty.js"></script>
+    <script src="js/noty/layouts/topCenter.js"></script>
+    <script src="js/noty/themes/default.js"></script>
+
+    <script>
+        $(function() {
+            init();
+        });
+    </script>
+    
+  </body>
+</html>
