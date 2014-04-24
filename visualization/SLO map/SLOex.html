@@ -20,7 +20,7 @@
         // Configuration //
         ///////////////////
 
-        var pointFileURL = 'http://equinox.iondune.com/pipelines/js/SLOPoints.js';
+        var pointFileURL = 'http://equinox.iondune.com/pipelines/js/';
 
 
         /////////////
@@ -39,13 +39,11 @@
         // WebGL program
         var pointProgram;
 
-        // WebGL array
-        var pointArrayBuffer;
-
         // Maps pixel coordinates to WebGL coordinates
         var pixelsToWebGLMatrix = new Float32Array(16);
 
-        var time = 0;
+        // WebGL arrays for each data source
+        var dataSources = new Array();
 
         // Data range
         var dataMax;
@@ -55,35 +53,34 @@
 
             // Initialize Map
             var mapOptions = {
-              zoom: 12,
+              zoom: 16,
               //39.3, -8.8
-              center: new google.maps.LatLng(35.29, -120.67),
+              center: new google.maps.LatLng(35.295, -120.67),
               mapTypeId: google.maps.MapTypeId.ROADMAP
             };
             var mapDiv = document.getElementById('map-div');
             map = new google.maps.Map(mapDiv, mapOptions);
 
-            noty({id: 'loading', text: "Loading Points... Please wait...", layout: 'topCenter'});
-            $.getScript(pointFileURL, function() {
+            // Initialize canvas
+            var canvasLayerOptions = {
+              map: map,
+              resizeHandler: resize,
+              animate: false,
+              updateHandler: update
+            };
+            canvasLayer = new CanvasLayer(canvasLayerOptions);
 
-                // Initialize canvas
-                var canvasLayerOptions = {
-                  map: map,
-                  resizeHandler: resize,
-                  animate: false,
-                  updateHandler: update
-                };
-                canvasLayer = new CanvasLayer(canvasLayerOptions);
+            // Initialize WebGL
+            gl = canvasLayer.canvas.getContext('experimental-webgl');
+            createShaderProgram();
 
-                // Initialize WebGL
-                gl = canvasLayer.canvas.getContext('experimental-webgl');
+            dataMax = -Infinity;
+            dataMin = Infinity;
 
-                createShaderProgram();
-                loadData();
-
-                $.noty.close('loading');
-                update();
-            });
+            loadData(0);
+            loadData(1);
+            loadData(2);
+            loadData(3);
         }
 
         function createShaderProgram() {
@@ -110,28 +107,37 @@
             gl.aPointSize = gl.getAttribLocation(pointProgram, "aPointSize");
         }
 
-        function loadData() {
+        function loadData(index) {
+            url = pointFileURL + "SLOPoints" + index + ".js";
+            console.debug("Loading from: " + url);
+            $.getScript(url, function()
+            {
+                var rawData = new Float32Array(3 * points.length);
+                for (var i = 0; i < points.length; i++)
+                {
+                    var pixel = LatLongToPixelXY(points[i].lat, points[i].lon);
+                    rawData[i * 3] = pixel.x ;
+                    rawData[i * 3 + 1] = pixel.y;
+                    rawData[i * 3 + 2] = points[i].temp;
 
-            dataMax = -Infinity;
-            dataMin = Infinity;
+                    if (points[i].temp > dataMax)
+                        dataMax = points[i].temp;
+                    if (points[i].temp < dataMin)
+                        dataMin = points[i].temp;
+                }
 
-            var rawData = new Float32Array(3 * points.length);
-            for (var i = 0; i < points.length; i++) {
-                var pixel = LatLongToPixelXY(points[i].lat, points[i].lon);
-                rawData[i * 3] = pixel.x ;
-                rawData[i * 3 + 1] = pixel.y;
-                rawData[i * 3 + 2] = points[i].temp;
+                dataSources[index] = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index]);
+                gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
 
-                if (points[i].temp > dataMax)
-                    dataMax = points[i].temp;
-                if (points[i].temp < dataMin)
-                    dataMin = points[i].temp;
-            }
+                pickDataSource(index);
+            });
+        }
 
-            pointArrayBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, pointArrayBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
+        function pickDataSource(index)
+        {
 
+            gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index]);
             var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
             gl.enableVertexAttribArray(attributeLoc);
             gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
@@ -168,10 +174,6 @@
         }
 
         function update() {
-
-            if (points == undefined)
-                return;
-
             gl.clear(gl.COLOR_BUFFER_BIT);
 
             gl.vertexAttrib1f(gl.aPointSize, Math.max(map.zoom - 6.0, 1.0));
@@ -191,8 +193,6 @@
 
             gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataMax);
             gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataMin);
-            gl.uniform1f(gl.getUniformLocation(pointProgram, 'time'), time);
-                console.debug("Value is:" + time);
 
             gl.drawArrays(gl.POINTS, 0, points.length);
         }
@@ -203,7 +203,6 @@
         attribute vec4 worldCoord;
         attribute float aPointSize;
         uniform mat4 mapMatrix;
-        uniform float time;
 
         varying float temperature;
 
@@ -211,7 +210,6 @@
             temperature = worldCoord.z;
 
             gl_Position = mapMatrix * worldCoord;
-            gl_Position += time * 0.2;
             gl_PointSize = aPointSize;
         }
     </script>
@@ -235,7 +233,7 @@
     <div id="map-div"></div>
     <div id="other-content" style="padding: 20px;">
         <div style="width: 200px">
-            Slider: <div id="slider"></div>
+            Time frame: <div id="slider"></div>
         </div>
         <p><span id="query"></span></p>
     </div>
@@ -258,6 +256,7 @@
                 time = ui.value;
                 $("#query").text(time);
                 update();
+                pickDataSource(time);
             }
             $("#slider").slider({
                 slide: refresh,
