@@ -4,6 +4,7 @@
   <head>
     <meta charset="utf-8">
     <title>SLO Temperatures</title>
+
     <style>
       html, body, #map-div {
         margin: 0;
@@ -13,8 +14,24 @@
     </style>
 
     <script>
+        ///////////////////
+        // Configuration //
+        ///////////////////
+
+        var pointFileURL = 'http://equinox.iondune.com/pipelines/js/SLOPoints.js';
+
+
+        /////////////
+        // Globals //
+        /////////////
+
+        // Google Maps API handle
         var map;
+
+        // WebGL canvas
         var canvasLayer;
+
+        // WebGL context
         var gl;
 
         var pointProgram;
@@ -24,8 +41,8 @@
         var mapMatrix = new Float32Array(16);
 
         function init() {
-        
-            // initialize the map
+
+            // Initialize Map
             var mapOptions = {
               zoom: 12,
               //39.3, -8.8
@@ -34,11 +51,11 @@
             };
             var mapDiv = document.getElementById('map-div');
             map = new google.maps.Map(mapDiv, mapOptions);
-            
-            noty({id: 'loading', text: "Loading Points (about 8MB). Please wait...", layout: 'topCenter'});
-            
-            $.getScript('http://localhost:8000/SLOPoints.js',function(){         
-                // initialize the canvasLayer
+
+            noty({id: 'loading', text: "Loading Points... Please wait...", layout: 'topCenter'});
+            $.getScript(pointFileURL, function() {
+
+                // Initialize canvas
                 var canvasLayerOptions = {
                   map: map,
                   resizeHandler: resize,
@@ -47,48 +64,45 @@
                 };
                 canvasLayer = new CanvasLayer(canvasLayerOptions);
 
-                // initialize WebGL
+                // Initialize WebGL
                 gl = canvasLayer.canvas.getContext('experimental-webgl');
-            
+
                 createShaderProgram();
                 loadData();
-                
+
                 $.noty.close('loading');
-                
                 update();
             });
         }
 
         function createShaderProgram() {
-            // create vertex shader
+
+            // Vertex shader
             var vertexSrc = document.getElementById('pointVertexShader').text;
             var vertexShader = gl.createShader(gl.VERTEX_SHADER);
             gl.shaderSource(vertexShader, vertexSrc);
             gl.compileShader(vertexShader);
 
-            // create fragment shader
+            // Fragment shader
             var fragmentSrc = document.getElementById('pointFragmentShader').text;
             var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
             gl.shaderSource(fragmentShader, fragmentSrc);
             gl.compileShader(fragmentShader);
 
-            // link shaders to create our program
+            // Link program
             pointProgram = gl.createProgram();
             gl.attachShader(pointProgram, vertexShader);
             gl.attachShader(pointProgram, fragmentShader);
             gl.linkProgram(pointProgram);
 
             gl.useProgram(pointProgram);
-
             gl.aPointSize = gl.getAttribLocation(pointProgram, "aPointSize");
         }
 
         function loadData() {
 
-            //Custom Load
             var rawData = new Float32Array(3 * points.length);
             for (var i = 0; i < points.length; i++) {
-
                 var pixel = LatLongToPixelXY(points[i].lat, points[i].lon);
                 rawData[i * 3] = pixel.x ;
                 rawData[i * 3 + 1] = pixel.y;
@@ -143,7 +157,7 @@
         function update() {
 
             if(points == undefined) return;
-    
+
             gl.clear(gl.COLOR_BUFFER_BIT);
 
             var currentZoom = map.zoom;
@@ -200,6 +214,7 @@
             gl_PointSize = aPointSize;
         }
     </script>
+
     <script id="pointFragmentShader" type="x-shader/x-fragment">
         precision mediump float;
         varying float temperature;
@@ -212,12 +227,12 @@
   </head>
 
   <body>
+
     <div id="map-div"></div>
-    
-    
+
     <script src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
-    
+
     <script src="js/CanvasLayer.js"></script>
     <script src="js/Utils.js"></script>
     <script src="js/noty/jquery.noty.js"></script>
@@ -229,6 +244,6 @@
             init();
         });
     </script>
-    
+
   </body>
 </html>
