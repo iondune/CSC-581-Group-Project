@@ -34,11 +34,18 @@
         // WebGL context
         var gl;
 
+        // WebGL program
         var pointProgram;
+
+        // WebGL array
         var pointArrayBuffer;
 
+        // Maps pixel coordinates to WebGL coordinates
         var pixelsToWebGLMatrix = new Float32Array(16);
-        var mapMatrix = new Float32Array(16);
+
+        // Data range
+        var dataMax;
+        var dataMin;
 
         function init() {
 
@@ -101,40 +108,43 @@
 
         function loadData() {
 
+            dataMax = -Infinity;
+            dataMin = Infinity;
+
             var rawData = new Float32Array(3 * points.length);
             for (var i = 0; i < points.length; i++) {
                 var pixel = LatLongToPixelXY(points[i].lat, points[i].lon);
                 rawData[i * 3] = pixel.x ;
                 rawData[i * 3 + 1] = pixel.y;
                 rawData[i * 3 + 2] = points[i].temp;
+
+                if (points[i].temp > dataMax)
+                    dataMax = points[i].temp;
+                if (points[i].temp < dataMin)
+                    dataMin = points[i].temp;
             }
 
-            // create webgl buffer, bind it, and load rawData into it
             pointArrayBuffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, pointArrayBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
 
-            // enable the 'worldCoord' attribute in the shader to receive buffer
             var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
             gl.enableVertexAttribArray(attributeLoc);
-
-            // tell webgl how buffer is laid out (pairs of x,y coords)
             gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
 
         }
 
         function resize() {
+
             var width = canvasLayer.canvas.width;
             var height = canvasLayer.canvas.height;
 
             gl.viewport(0, 0, width, height);
-
-            // matrix which maps pixel coordinates to WebGL coordinates
             pixelsToWebGLMatrix.set([2/width, 0, 0, 0, 0, -2/height, 0, 0, 0, 0, 0, 0, -1, 1, 0, 1]);
         }
 
         function scaleMatrix(matrix, scaleX, scaleY) {
-            // scaling x and y, which is just scaling first two columns of matrix
+
             matrix[0] *= scaleX;
             matrix[1] *= scaleX;
             matrix[2] *= scaleX;
@@ -147,7 +157,7 @@
         }
 
         function translateMatrix(matrix, tx, ty) {
-            // translation is in last column of matrix
+
             matrix[12] += matrix[0]*tx + matrix[4]*ty;
             matrix[13] += matrix[1]*tx + matrix[5]*ty;
             matrix[14] += matrix[2]*tx + matrix[6]*ty;
@@ -156,46 +166,29 @@
 
         function update() {
 
-            if(points == undefined) return;
+            if (points == undefined)
+                return;
 
             gl.clear(gl.COLOR_BUFFER_BIT);
 
-            var currentZoom = map.zoom;
+            gl.vertexAttrib1f(gl.aPointSize, Math.max(map.zoom - 6.0, 1.0));
 
-            var pointSize = Math.max(currentZoom - 6.0, 1.0);
-
-
-            gl.vertexAttrib1f(gl.aPointSize, pointSize);
-
-            var mapProjection = map.getProjection();
-
-            /**
-             * We need to create a transformation that takes world coordinate
-             * points in the pointArrayBuffer to the coodinates WebGL expects.
-             * 1. Start with second half in pixelsToWebGLMatrix, which takes pixel
-             *     coordinates to WebGL coordinates.
-             * 2. Scale and translate to take world coordinates to pixel coords
-             * see https://developers.google.com/maps/documentation/javascript/maptypes#MapCoordinate
-             */
-
-            // copy pixel->webgl matrix
+            var mapMatrix = new Float32Array(16);
             mapMatrix.set(pixelsToWebGLMatrix);
 
-            // Scale to current zoom (worldCoords * 2^zoom)
             var scale = Math.pow(2, map.zoom);
             scaleMatrix(mapMatrix, scale, scale);
 
-            // translate to current view (vector from topLeft to 0,0)
-            var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
+            var offset = map.getProjection().fromLatLngToPoint(canvasLayer.getTopLeft());
             translateMatrix(mapMatrix, -offset.x, -offset.y);
 
-            // attach matrix value to 'mapMatrix' uniform in shader
             var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
             gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
 
-            // draw!
-            gl.drawArrays(gl.POINTS, 0, points.length);
+            gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataMax);
+            gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataMin);
 
+            gl.drawArrays(gl.POINTS, 0, points.length);
         }
 
     </script>
@@ -208,9 +201,9 @@
         varying float temperature;
 
         void main() {
-            // transform world coordinate by matrix uniform variable
-            gl_Position = mapMatrix * worldCoord;
             temperature = worldCoord.z;
+
+            gl_Position = mapMatrix * worldCoord;
             gl_PointSize = aPointSize;
         }
     </script>
@@ -219,9 +212,12 @@
         precision mediump float;
         varying float temperature;
 
-        //alert(temperature);
+        uniform float dataMin;
+        uniform float dataMax;
+
         void main() {
-            gl_FragColor = vec4(temperature / 100.0, 0.0, 1.0 / (temperature / 10.0), 0.3);
+            float value = (temperature - dataMin) / (dataMax - dataMin);
+            gl_FragColor = vec4(value, 0.0, 1.0 - value, 0.3);
         }
     </script>
   </head>
