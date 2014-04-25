@@ -22,7 +22,6 @@
 
         var pointFileURL = 'http://equinox.iondune.com/pipelines/js/';
 
-
         /////////////
         // Globals //
         /////////////
@@ -48,6 +47,9 @@
         // Data range
         var dataMax;
         var dataMin;
+
+        // Number of data files to load
+        var dataFiles = 4;
 
         function init() {
 
@@ -77,10 +79,9 @@
             dataMax = -Infinity;
             dataMin = Infinity;
 
-            loadData(0);
-            loadData(1);
-            loadData(2);
-            loadData(3);
+            for (var i = 0; i < dataFiles; i++) {
+                loadData(i);
+            };
         }
 
         function createShaderProgram() {
@@ -136,7 +137,6 @@
 
         function pickDataSource(index)
         {
-
             gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index]);
             var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
             gl.enableVertexAttribArray(attributeLoc);
@@ -239,8 +239,8 @@
     </div>
 
     <script src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
-    <script src="//code.jquery.com/jquery-1.10.2.js"></script>
-    <script src="//code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+    <script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+    <script src="http://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
 
 
     <script src="js/CanvasLayer.js"></script>
@@ -255,14 +255,15 @@
             function refresh(event, ui) {
                 time = ui.value;
                 $("#query").text(time);
-                update();
                 pickDataSource(time);
+                update();
             }
             $("#slider").slider({
                 slide: refresh,
                 min: 0,
-                max: 3,
-                step: 1
+                max: dataFiles - 1,
+                step: 1,
+                value: 0
             });
         });
     </script>
