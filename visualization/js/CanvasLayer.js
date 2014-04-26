@@ -464,6 +464,10 @@ CanvasLayer.prototype.getTopLeft = function() {
   return this.topLeft_;
 };
 
+CanvasLayer.prototype.isAdded = function() {
+  return this.isAdded_;
+};
+
 /**
  * Schedule a requestAnimationFrame callback to updateHandler. If one is
  * already scheduled, there is no effect.

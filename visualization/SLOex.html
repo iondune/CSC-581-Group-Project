@@ -20,7 +20,8 @@
         // Configuration //
         ///////////////////
 
-        var pointFileURL = 'http://equinox.iondune.com/pipelines/js/data/';
+        var pointFileURL = 'js/data/';
+
 
         /////////////
         // Globals //
@@ -43,6 +44,7 @@
 
         // WebGL arrays for each data source
         var dataSources = new Array();
+        var currentDataSource = -1;
 
         // Data range
         var dataMax;
@@ -58,7 +60,6 @@
             // Initialize Map
             var mapOptions = {
               zoom: 16,
-              //39.3, -8.8
               center: new google.maps.LatLng(35.295, -120.67),
               mapTypeId: google.maps.MapTypeId.ROADMAP
             };
@@ -69,8 +70,7 @@
             var canvasLayerOptions = {
               map: map,
               resizeHandler: resize,
-              animate: false,
-              updateHandler: update
+              animate: false
             };
             canvasLayer = new CanvasLayer(canvasLayerOptions);
 
@@ -92,7 +92,10 @@
                 $.when.apply($, loaded).done(function ()
                 {
                     pickDataSource(0);
+                    console.debug("Making first call to update");
                     update();
+                    console.debug("Setting update handler");
+                    canvasLayer.setUpdateHandler(update);
 
                     $.noty.close('loading');
                     console.debug("Loaded data.");
@@ -141,11 +144,12 @@
         function loadData(index)
         {
             var data = $.Deferred();
-            var url = pointFileURL + "SLOPoints" + index + ".js";
+            var url = pointFileURL + "SLOPoints" + index + ".json";
 
             console.debug("Loading from: " + url);
-            $.getScript(url, function()
+            $.getJSON(url, function(points)
             {
+                console.debug("Loading from " + url + " is started.");
                 var rawData = new Float32Array(3 * points.length);
                 for (var i = 0; i < points.length; i++)
                 {
@@ -160,8 +164,11 @@
                         dataMin = points[i].temp;
                 }
 
-                dataSources[index] = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index]);
+                dataSources[index] = {
+                    'length': points.length,
+                    'buffer': gl.createBuffer()
+                };
+                gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
                 gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
 
                 console.debug("Loading from " + url + " is done.");
@@ -174,14 +181,15 @@
         function pickDataSource(index)
         {
             console.debug("Picking data source " + index);
-            gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index]);
+            gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
             var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
             gl.enableVertexAttribArray(attributeLoc);
             gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
+            currentDataSource = index;
         }
 
-        function resize() {
-
+        function resize()
+        {
             var width = canvasLayer.canvas.width;
             var height = canvasLayer.canvas.height;
 
@@ -211,9 +219,15 @@
         }
 
         function update() {
-            if (typeof points === 'undefined')
+            if (currentDataSource == -1)
             {
                 console.debug("Aborting draw, data not yet loaded.");
+                return;
+            }
+
+            if (! canvasLayer.isAdded())
+            {
+                console.debug("Aborting draw, canvas not added yet.");
                 return;
             }
 
@@ -237,7 +251,7 @@
             gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataMax);
             gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataMin);
 
-            gl.drawArrays(gl.POINTS, 0, points.length);
+            gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
         }
 
     </script>
