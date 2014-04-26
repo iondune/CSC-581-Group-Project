@@ -53,6 +53,8 @@
 
         function init() {
 
+            var data = $.Deferred();
+
             // Initialize Map
             var mapOptions = {
               zoom: 16,
@@ -74,43 +76,70 @@
 
             // Initialize WebGL
             gl = canvasLayer.canvas.getContext('experimental-webgl');
-            createShaderProgram();
+            var shaders = createShaderProgram();
 
             dataMax = -Infinity;
             dataMin = Infinity;
 
-            for (var i = 0; i < dataFiles; i++) {
-                loadData(i);
-            };
-            pickDataSource(0);
+            shaders.done(function ()
+            {
+                console.debug("Loading data...");
+                var loaded = [];
+                for (var i = 0; i < dataFiles; i++)
+                    loaded.push(loadData(i));
+
+                $.when.apply($, loaded).done(function ()
+                {
+                    pickDataSource(0);
+                    update();
+                    console.debug("Loaded data.");
+                    data.resolve();
+                });
+            });
+
+            return data;
         }
 
-        function createShaderProgram() {
+        function createShaderProgram()
+        {
+            var shaders = $.Deferred();
 
-            // Vertex shader
-            var vertexSrc = document.getElementById('pointVertexShader').text;
-            var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-            gl.shaderSource(vertexShader, vertexSrc);
-            gl.compileShader(vertexShader);
+            console.debug("Loading shaders...");
+            ShaderLoader.load(
+                function (data)
+                {
+                    var vertexSource = data.point.vertex;
+                    var fragmentSource = data.point.fragment;
 
-            // Fragment shader
-            var fragmentSrc = document.getElementById('pointFragmentShader').text;
-            var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-            gl.shaderSource(fragmentShader, fragmentSrc);
-            gl.compileShader(fragmentShader);
+                    var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+                    gl.shaderSource(vertexShader, vertexSource);
+                    gl.compileShader(vertexShader);
 
-            // Link program
-            pointProgram = gl.createProgram();
-            gl.attachShader(pointProgram, vertexShader);
-            gl.attachShader(pointProgram, fragmentShader);
-            gl.linkProgram(pointProgram);
+                    var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+                    gl.shaderSource(fragmentShader, fragmentSource);
+                    gl.compileShader(fragmentShader);
 
-            gl.useProgram(pointProgram);
-            gl.aPointSize = gl.getAttribLocation(pointProgram, "aPointSize");
+                    pointProgram = gl.createProgram();
+                    gl.attachShader(pointProgram, vertexShader);
+                    gl.attachShader(pointProgram, fragmentShader);
+                    gl.linkProgram(pointProgram);
+
+                    gl.useProgram(pointProgram);
+                    gl.aPointSize = gl.getAttribLocation(pointProgram, "aPointSize");
+
+                    console.debug("Loaded shaders.");
+                    shaders.resolve();
+                }
+            );
+
+            return shaders;
         }
 
-        function loadData(index) {
-            url = pointFileURL + "SLOPoints" + index + ".js";
+        function loadData(index)
+        {
+            var data = $.Deferred();
+            var url = pointFileURL + "SLOPoints" + index + ".js";
+
             console.debug("Loading from: " + url);
             $.getScript(url, function()
             {
@@ -132,12 +161,16 @@
                 gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index]);
                 gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
 
-                pickDataSource(index);
+                console.debug("Loading from " + url + " is done.");
+                data.resolve();
             });
+
+            return data;
         }
 
         function pickDataSource(index)
         {
+            console.debug("Picking data source " + index);
             gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index]);
             var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
             gl.enableVertexAttribArray(attributeLoc);
@@ -175,6 +208,12 @@
         }
 
         function update() {
+            if (typeof points === 'undefined')
+            {
+                console.debug("Aborting draw, data not yet loaded.");
+                return;
+            }
+
             gl.clear(gl.COLOR_BUFFER_BIT);
 
             gl.vertexAttrib1f(gl.aPointSize, Math.max(map.zoom - 6.0, 1.0));
@@ -200,33 +239,9 @@
 
     </script>
 
-    <script id="pointVertexShader" type="x-shader/x-vertex">
-        attribute vec4 worldCoord;
-        attribute float aPointSize;
-        uniform mat4 mapMatrix;
+    <script data-name="point" type="x-shader/x-vertex" data-src="js/shaders/pointVertexShader.js"></script>
+    <script data-name="point" type="x-shader/x-fragment" data-src="js/shaders/pointFragmentShader.js"></script>
 
-        varying float temperature;
-
-        void main() {
-            temperature = worldCoord.z;
-
-            gl_Position = mapMatrix * worldCoord;
-            gl_PointSize = aPointSize;
-        }
-    </script>
-
-    <script id="pointFragmentShader" type="x-shader/x-fragment">
-        precision mediump float;
-        varying float temperature;
-
-        uniform float dataMin;
-        uniform float dataMax;
-
-        void main() {
-            float value = (temperature - dataMin) / (dataMax - dataMin);
-            gl_FragColor = vec4(value, 0.0, 1.0 - value, 0.3);
-        }
-    </script>
   </head>
 
   <body>
@@ -249,25 +264,31 @@
     <!-- Utilities -->
     <script src="js/CanvasLayer.js"></script>
     <script src="js/Utils.js"></script>
+    <script src="js/ShaderLoader.min.js"></script>
     <script src="js/noty/jquery.noty.js"></script>
     <script src="js/noty/layouts/topCenter.js"></script>
     <script src="js/noty/themes/default.js"></script>
 
     <script>
         $(function() {
-            init();
-            function refresh(event, ui) {
-                time = ui.value;
-                $("#query").text(time);
-                pickDataSource(time);
-                update();
-            }
-            $("#slider").slider({
-                slide: refresh,
-                min: 0,
-                max: dataFiles - 1,
-                step: 1,
-                value: 0
+            init().done(function ()
+            {
+                console.debug("Initializing slider...");
+
+                function refresh(event, ui) {
+                    time = ui.value;
+                    $("#query").text(time);
+                    pickDataSource(time);
+                    update();
+                }
+
+                $("#slider").slider({
+                    slide: refresh,
+                    min: 0,
+                    max: dataFiles - 1,
+                    step: 1,
+                    value: 0
+                });
             });
         });
     </script>
