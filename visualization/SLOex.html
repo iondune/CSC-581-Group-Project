@@ -84,6 +84,7 @@
             shaders.done(function ()
             {
                 console.debug("Loading data...");
+                noty({id: 'loading', text: "Loading data from " + dataFiles + " files...", layout: 'topCenter'});
                 var loaded = [];
                 for (var i = 0; i < dataFiles; i++)
                     loaded.push(loadData(i));
@@ -92,6 +93,8 @@
                 {
                     pickDataSource(0);
                     update();
+
+                    $.noty.close('loading');
                     console.debug("Loaded data.");
                     data.resolve();
                 });
