@@ -20,7 +20,7 @@
         // Configuration //
         ///////////////////
 
-        var pointFileURL = 'http://equinox.iondune.com/pipelines/js/';
+        var pointFileURL = 'http://equinox.iondune.com/pipelines/js/data/';
 
         /////////////
         // Globals //
@@ -82,6 +82,7 @@
             for (var i = 0; i < dataFiles; i++) {
                 loadData(i);
             };
+            pickDataSource(0);
         }
 
         function createShaderProgram() {
@@ -245,7 +246,7 @@
     <script src="http://code.jquery.com/jquery-1.11.0.js"></script>
     <script src="http://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
 
-
+    <!-- Utilities -->
     <script src="js/CanvasLayer.js"></script>
     <script src="js/Utils.js"></script>
     <script src="js/noty/jquery.noty.js"></script>
