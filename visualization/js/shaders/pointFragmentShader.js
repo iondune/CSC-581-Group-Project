@@ -11,4 +11,5 @@ void main()
 {
     float value = (temperature - dataMin) / (dataMax - dataMin);
     gl_FragColor = vec4(value, 0.0, 1.0 - value, 0.3);
+    //gl_FragColor = vec4(1.0, 0.0, 0.4, 0.3);
 }

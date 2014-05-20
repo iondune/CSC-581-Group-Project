@@ -3,7 +3,9 @@
 // Configuration //
 ///////////////////
 
-var pointFileURL = 'js/data/';
+//var pointFileURL = 'js/data/';
+//var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
+var pointFileURL = 'http://localhost:8000/js/data/';
 
 
 /////////////
@@ -29,6 +31,9 @@ var pixelsToWebGLMatrix = new Float32Array(16);
 var dataSources = new Array();
 var currentDataSource = -1;
 
+//Arrow buffers
+var arrowPosBuf
+
 // Data range
 var dataMax = -Infinity;
 var dataMin = Infinity;
@@ -40,6 +45,7 @@ function init()
 {
     initMap();
     initCanvas();
+    initArrow();
 
     var load = $.Deferred();
     loadShaders().done(function ()
@@ -73,6 +79,25 @@ function initCanvas()
     };
     canvasLayer = new CanvasLayer(canvasLayerOptions);
     gl = canvasLayer.canvas.getContext('experimental-webgl');
+}
+
+function initArrow()
+{
+    var vertices = [
+        -.5, -.5, 0,
+        .5, -.5, 0,
+        -.5, .25, 0,
+        .5, .25, 0,
+        -.75, .25, 0,
+        .75, .25, 0,
+        0, .5, 0
+    ];
+    arrowPosBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+    arrowPosBuf.itemSize = 3;
+    arrowPosBuf.numItems = 7;
+    console.debug("Arrow loaded");
 }
 
 function loadShaders()
@@ -227,26 +252,48 @@ function update()
 
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    gl.vertexAttrib1f(gl.aPointSize, Math.max(map.zoom - 6.0, 1.0));
+    if($("#WeatherLayerSelector").is(':checked'))
+    {
+        console.debug("Drawing weather layer");
+        gl.vertexAttrib1f(gl.aPointSize, Math.max(map.zoom - 6.0, 1.0));
+        var mapMatrix = new Float32Array(16);
+        mapMatrix.set(pixelsToWebGLMatrix);
 
-    var mapMatrix = new Float32Array(16);
-    mapMatrix.set(pixelsToWebGLMatrix);
+        var scale = Math.pow(2, map.zoom);
+        scaleMatrix(mapMatrix, scale, scale);
 
-    var scale = Math.pow(2, map.zoom);
-    scaleMatrix(mapMatrix, scale, scale);
+        var mapProjection = map.getProjection();
+        var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
+        translateMatrix(mapMatrix, -offset.x, -offset.y);
 
-    var mapProjection = map.getProjection();
-    var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
-    translateMatrix(mapMatrix, -offset.x, -offset.y);
+        var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
+        gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
 
-    var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
-    gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataMax);
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataMin);
 
-    gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataMax);
-    gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataMin);
+        gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
 
-    gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
-}
+        //Matrix to transform arrow into "world space" aka lat/long coordinates
+        var modelMatrix = new Float32Array(16);
+        modelMatrix.set(pixelsToWebGLMatrix);
+        scaleMatrix(modelMatrix, 5, 5);
+        translateMatrix(modelMatrix, 35.292394, -120.661159);
+        var worldMatrixLoc = gl.getUniformLocation(pointProgram, 'modelMatrix');
+        gl.uniformMatrix4fv(worldMatrixLoc, false, modelMatrix);
+
+        //gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
+        //gl.vertexAttribPointer(pointProgram.worldCoord, arrowPosBuf.itemSize, gl.FLOAT, false, 0, 0);
+        //gl.drawArrays(gl.TRIANGLES, 0, arrowPosBuf.numItems);
+
+        
+    }
+    if($("#SeismicLayerSelector").is(':checked'))
+    {
+        console.debug("Drawing seismic data");
+        //Do seismic stuff here
+    }
+} 
 
 $(function()
 {
