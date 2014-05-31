@@ -3,10 +3,8 @@
 // Configuration //
 ///////////////////
 
-//var pointFileURL = 'js/data/';
 //var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
 var pointFileURL = 'http://localhost:8000/js/data/';
-
 
 /////////////
 // Globals //
@@ -172,6 +170,10 @@ function loadDataSource(index)
         for (var i = 0; i < points.length; i++)
         {
             var pixel = LatLongToPixelXY(points[i].lat, points[i].lon);
+            if(index == 0)
+            {
+                console.debug("Point " + i + " X: " + pixel.x + " Y: " + pixel.y);
+            }
             rawData[i * 3] = pixel.x ;
             rawData[i * 3 + 1] = pixel.y;
             rawData[i * 3 + 2] = points[i].temp;
@@ -189,7 +191,7 @@ function loadDataSource(index)
         };
         gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
         gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
-
+        console.debug("Resolving " + index);
         data.resolve();
     });
 
@@ -199,6 +201,7 @@ function loadDataSource(index)
 function pickDataSource(index)
 {
     console.debug("Picking data source " + index);
+    console.debug("Drawing " + dataSources[index].length + " points");
     gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
     var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
     gl.enableVertexAttribArray(attributeLoc);
@@ -255,7 +258,7 @@ function update()
     if($("#WeatherLayerSelector").is(':checked'))
     {
         console.debug("Drawing weather layer");
-        gl.vertexAttrib1f(gl.aPointSize, Math.max(map.zoom - 6.0, 1.0));
+        gl.vertexAttrib1f(gl.aPointSize, Math.max(3 * map.zoom, 1.0));
         var mapMatrix = new Float32Array(16);
         mapMatrix.set(pixelsToWebGLMatrix);
 
@@ -264,6 +267,7 @@ function update()
 
         var mapProjection = map.getProjection();
         var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
+        console.debug("Top left @ (" + offset.x + ", " + offset.y + ")");
         translateMatrix(mapMatrix, -offset.x, -offset.y);
 
         var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');

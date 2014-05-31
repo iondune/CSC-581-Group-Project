@@ -10,7 +10,7 @@
       html, body, #map-div {
         margin: 0;
         padding: 0;
-        height: 95%;
+        height: 100%;
       }
     </style>
 
@@ -20,20 +20,48 @@
   </head>
 
   <body>
-
-    <div id="map-div"></div>
-    <div id="other-content" style="padding: 20px;">
-        <div style="width: 200px; float: left;">
+  
+    <div style="width: 185px; height = 100%; float: left; clear: left; padding: 15px" id="other-content">
+        <div style="width: 185px;">
             Time frame: <div id="slider"></div>
             <p><span id="query">0</span></p>
         </div>
-        <div style="margin-left: 220px;">
-            <form action="">
-                <input type="checkbox" id="WeatherLayerSelector" onclick="update()">Weather<br>
-                <input type="checkbox" id="SeismicLayerSelector" onclick="update()">Seismic
-            </form>
+        <div style ="width: 185px;">
+            Weather Selectors:
+            <div style="display: block; padding-left: 15px;">
+                <form action="">
+                    <input type="radio" name="WeatherSelectors" id="WeatherLayerSelector2" onclick="update()">Dew Point<br>
+                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Atmospheric Pressure<br>
+                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Visibility<br>
+                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Wind Speed<br>
+                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Max Wind Speed<br>
+                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Rainfall<br>
+                </form>
+            </div>
         </div>
+        <div style ="width: 185px;">
+            Seismic Selectors:
+            <div style="display: block; padding-left: 15px;">
+                <form action="">
+                    <input type="radio" name="SeismicSelectors" id="WeatherLayerSelector3" onclick="update()">Magnitude<br>
+                    <input type="radio" name="SeismicSelectors" id="WeatherLayerSelector3" onclick="update()">Depth<br>
+                    <input type="radio" name="SeismicSelectors" id="WeatherLayerSelector3" onclick="update()">Significance<br> <!-- int between 0-1000 -->
+                    <input type="radio" name="SeismicSelectors" id="WeatherLayerSelector3" onclick="update()">Affected Stations<br>
+                </form>
+            </div> 
+        </div>
+        <!-- <div style ="width: 185px;"> Not currently used
+            Other Selectors:
+            <div style="display: block; padding-left: 15px;">
+                <form action="">
+                    <input type="radio" name="OtherSelectors" id="WeatherLayerSelector" onclick="update()">Weather<br>
+                    <input type="radio" name="OtherSelectors" id="SeismicLayerSelector" onclick="update()">Seismic
+                </form>
+            </div> 
+        </div> -->
     </div>
+    <div id="map-div" style="height: 100%"></div>
+    
 
     <!-- Google Maps API -->
     <script src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
