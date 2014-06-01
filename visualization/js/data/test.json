@@ -1,0 +1,24 @@
+[
+    {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [35.292394, -120.661159]
+        },
+        "properties": {
+            "Temp": 100.0,
+            "DewPoint": 50
+        }
+    },
+    {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [35.296057, -120.666781]
+        },
+        "properties": {
+            "Temp": 1.0,
+            "DewPoint": 2.0
+        }
+    }
+]

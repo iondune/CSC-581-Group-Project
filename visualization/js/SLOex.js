@@ -37,13 +37,14 @@ var dataMax = -Infinity;
 var dataMin = Infinity;
 
 // Number of data files to load
-var dataFiles = 4;
+var dataFiles = 5;
 
 function init()
 {
     initMap();
     initCanvas();
     initArrow();
+    newLoadDataSource(4)
 
     var load = $.Deferred();
     loadShaders().done(function ()
@@ -141,7 +142,7 @@ function loadData()
     noty({id: 'loading', text: "Loading data from " + dataFiles + " files...", layout: 'topCenter'});
 
     var loaded = [];
-    for (var i = 0; i < dataFiles; i++)
+    for (var i = 0; i < dataFiles ; i++)
         loaded.push(loadDataSource(i));
 
     $.when.apply($, loaded).done(function ()
@@ -158,6 +159,38 @@ function loadData()
     return data;
 }
 
+function newLoadDataSource(index)
+{
+    var data = $.Deferred();
+    var url = pointFileURL + "test.json";
+
+    $.getJSON(url, function(points)
+    {
+        var rawData = new Float32Array(3 * points.length);
+        for(var i = 0; i < points.length; i++)
+        {
+            var pixel = LatLongToPixelXY(points[i].geometry.coordinates[0], points[i].geometry.coordinates[1]);
+            rawData[i * 3] = pixel.x ;
+            rawData[i * 3 + 1] = pixel.y;
+            rawData[i * 3 + 2] = points[i].properties.Temp;
+
+            if (points[i].temp > dataMax)
+                dataMax = points[i].temp;
+            if (points[i].temp < dataMin)
+                dataMin = points[i].temp;
+        }
+        dataSources[index] =
+        {
+            'length': points.length,
+            'buffer': gl.createBuffer()
+        };
+        gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
+        console.debug("Resolving " + index);
+        data.resolve();
+    })
+}
+
 function loadDataSource(index)
 {
     var data = $.Deferred();
@@ -170,10 +203,6 @@ function loadDataSource(index)
         for (var i = 0; i < points.length; i++)
         {
             var pixel = LatLongToPixelXY(points[i].lat, points[i].lon);
-            if(index == 0)
-            {
-                console.debug("Point " + i + " X: " + pixel.x + " Y: " + pixel.y);
-            }
             rawData[i * 3] = pixel.x ;
             rawData[i * 3 + 1] = pixel.y;
             rawData[i * 3 + 2] = points[i].temp;
@@ -205,7 +234,7 @@ function pickDataSource(index)
     gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
     var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
     gl.enableVertexAttribArray(attributeLoc);
-    gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(attributeLoc, , gl.FLOAT, false, 0, 0);
     currentDataSource = index;
 }
 
@@ -254,9 +283,9 @@ function update()
     }
 
     gl.clear(gl.COLOR_BUFFER_BIT);
-
-    if($("#WeatherLayerSelector").is(':checked'))
+    if($("#WeatherForm input[type='radio']:checked").val() != "NoSelection")
     {
+        //Color represents temperature, size changes with value
         console.debug("Drawing weather layer");
         gl.vertexAttrib1f(gl.aPointSize, Math.max(3 * map.zoom, 1.0));
         var mapMatrix = new Float32Array(16);
@@ -289,13 +318,11 @@ function update()
         //gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
         //gl.vertexAttribPointer(pointProgram.worldCoord, arrowPosBuf.itemSize, gl.FLOAT, false, 0, 0);
         //gl.drawArrays(gl.TRIANGLES, 0, arrowPosBuf.numItems);
-
-        
     }
-    if($("#SeismicLayerSelector").is(':checked'))
+    if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
         console.debug("Drawing seismic data");
-        //Do seismic stuff here
+        //Seismic data drawn fixed color, size varies with value
     }
 } 
 

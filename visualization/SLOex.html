@@ -29,24 +29,26 @@
         <div style ="width: 185px;">
             Weather Selectors:
             <div style="display: block; padding-left: 15px;">
-                <form action="">
-                    <input type="radio" name="WeatherSelectors" id="WeatherLayerSelector2" onclick="update()">Dew Point<br>
-                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Atmospheric Pressure<br>
-                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Visibility<br>
-                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Wind Speed<br>
-                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Max Wind Speed<br>
-                    <input type="radio" name="WeatherSelectors" id="SeismicLayerSelector2" onclick="update()">Rainfall<br>
+                <form action="" id="WeatherForm">
+                    <input type="radio" name="WeatherSelectors" value="DewPoint" onclick="update()" >Dew Point<br>
+                    <input type="radio" name="WeatherSelectors" value="AtmosphericPressure" onclick="update()">Atmospheric Pressure<br>
+                    <input type="radio" name="WeatherSelectors" value="Visibility" onclick="update()">Visibility<br>
+                    <input type="radio" name="WeatherSelectors" value="WindSpeed" onclick="update()">Wind Speed<br>
+                    <input type="radio" name="WeatherSelectors" value="MaxWind" onclick="update()">Max Wind Speed<br>
+                    <input type="radio" name="WeatherSelectors" value="Rainfall" onclick="update()">Rainfall<br>
+                    <input type="radio" name="WeatherSelectors" value="NoSelection" onclick="update()" checked>No Selection <br>
                 </form>
             </div>
         </div>
         <div style ="width: 185px;">
             Seismic Selectors:
             <div style="display: block; padding-left: 15px;">
-                <form action="">
-                    <input type="radio" name="SeismicSelectors" id="WeatherLayerSelector3" onclick="update()">Magnitude<br>
-                    <input type="radio" name="SeismicSelectors" id="WeatherLayerSelector3" onclick="update()">Depth<br>
-                    <input type="radio" name="SeismicSelectors" id="WeatherLayerSelector3" onclick="update()">Significance<br> <!-- int between 0-1000 -->
-                    <input type="radio" name="SeismicSelectors" id="WeatherLayerSelector3" onclick="update()">Affected Stations<br>
+                <form action="" id="SeismicForm">
+                    <input type="radio" name="SeismicSelectors" value="Magnitude" onclick="update()">Magnitude<br>
+                    <input type="radio" name="SeismicSelectors" value="Depth" onclick="update()">Depth<br>
+                    <input type="radio" name="SeismicSelectors" value="Significance" onclick="update()">Significance<br> <!-- int between 0-1000 -->
+                    <input type="radio" name="SeismicSelectors" value="AffectedStations" onclick="update()">Affected Stations<br>
+                    <input type="radio" name="SeismicSelectors" value="NoSelection" onclick="update()" checked>No Selection <br>
                 </form>
             </div> 
         </div>
