@@ -37,14 +37,14 @@ var dataMax = -Infinity;
 var dataMin = Infinity;
 
 // Number of data files to load
-var dataFiles = 5;
+var dataFiles = 4;
 
 function init()
 {
     initMap();
     initCanvas();
     initArrow();
-    newLoadDataSource(4)
+    //newLoadDataSource(4)
 
     var load = $.Deferred();
     loadShaders().done(function ()
@@ -234,7 +234,7 @@ function pickDataSource(index)
     gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
     var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
     gl.enableVertexAttribArray(attributeLoc);
-    gl.vertexAttribPointer(attributeLoc, , gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
     currentDataSource = index;
 }
 
