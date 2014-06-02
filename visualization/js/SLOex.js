@@ -37,14 +37,14 @@ var dataMax = -Infinity;
 var dataMin = Infinity;
 
 // Number of data files to load
-var dataFiles = 4;
+var dataFiles = 5;
 
 function init()
 {
     initMap();
     initCanvas();
     initArrow();
-    //newLoadDataSource(4)
+    newLoadDataSource(4)
 
     var load = $.Deferred();
     loadShaders().done(function ()
@@ -142,7 +142,7 @@ function loadData()
     noty({id: 'loading', text: "Loading data from " + dataFiles + " files...", layout: 'topCenter'});
 
     var loaded = [];
-    for (var i = 0; i < dataFiles ; i++)
+    for (var i = 0; i < dataFiles - 1 ; i++)
         loaded.push(loadDataSource(i));
 
     $.when.apply($, loaded).done(function ()
@@ -162,27 +162,32 @@ function loadData()
 function newLoadDataSource(index)
 {
     var data = $.Deferred();
-    var url = pointFileURL + "test.json";
+    var url = pointFileURL + "goodData.json";
 
     $.getJSON(url, function(points)
     {
-        var rawData = new Float32Array(3 * points.length);
-        for(var i = 0; i < points.length; i++)
+        var i;
+        var tempMin = Infinity;
+        var tempMax = -Infinity           
+        var rawData = new Float32Array(3 * points.features.length);
+        for(var i = 0; i < points.features.length; i++)
         {
-            var pixel = LatLongToPixelXY(points[i].geometry.coordinates[0], points[i].geometry.coordinates[1]);
-            rawData[i * 3] = pixel.x ;
+            var pixel = LatLongToPixelXY(points.features[i].geometry.coordinates[1], points.features[i].geometry.coordinates[0]);
+            rawData[i * 3] = pixel.x;
             rawData[i * 3 + 1] = pixel.y;
-            rawData[i * 3 + 2] = points[i].properties.Temp;
+            rawData[i * 3 + 2] = points.features[i].properties.temperature;
 
-            if (points[i].temp > dataMax)
-                dataMax = points[i].temp;
-            if (points[i].temp < dataMin)
-                dataMin = points[i].temp;
+            if (points.features[i].properties.temperature > tempMax)
+                tempMax = points.features[i].properties.temperature;
+            if (points.features[i].properties.temperature < tempMin)
+                tempMin = points.features[i].properties.temperature;
         }
         dataSources[index] =
         {
-            'length': points.length,
-            'buffer': gl.createBuffer()
+            'length': points.features.length,
+            'buffer': gl.createBuffer(),
+            'tempMin': tempMin,
+            'tempMax' : tempMax
         };
         gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
         gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
@@ -231,10 +236,22 @@ function pickDataSource(index)
 {
     console.debug("Picking data source " + index);
     console.debug("Drawing " + dataSources[index].length + " points");
+    if(index == dataFiles - 1)
+    {
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataSources[index].tempMax);
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataSources[index].tempMin);
+    }
+    else
+    {
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataMax);
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataMin);
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
     var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
     gl.enableVertexAttribArray(attributeLoc);
     gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
+    //Load color temperature values, this if check is temporary 
+    
     currentDataSource = index;
 }
 
@@ -287,7 +304,7 @@ function update()
     {
         //Color represents temperature, size changes with value
         console.debug("Drawing weather layer");
-        gl.vertexAttrib1f(gl.aPointSize, Math.max(3 * map.zoom, 1.0));
+        gl.vertexAttrib1f(gl.aPointSize, Math.max(2.25 * map.zoom, 1.0));
         var mapMatrix = new Float32Array(16);
         mapMatrix.set(pixelsToWebGLMatrix);
 
@@ -296,14 +313,11 @@ function update()
 
         var mapProjection = map.getProjection();
         var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
-        console.debug("Top left @ (" + offset.x + ", " + offset.y + ")");
+        //console.debug("Top left @ (" + offset.x + ", " + offset.y + ")");
         translateMatrix(mapMatrix, -offset.x, -offset.y);
 
         var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
         gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
-
-        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataMax);
-        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataMin);
 
         gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
 
