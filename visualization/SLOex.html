@@ -4,7 +4,8 @@
     <meta charset="utf-8">
     <title>SLO Temperatures</title>
 
-    <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" />
+    <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/ui-darkness/jquery-ui.css" />
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootswatch/3.1.1/darkly/bootstrap.min.css" />
 
     <style>
       html, body, #map-div {
@@ -20,14 +21,18 @@
   </head>
 
   <body>
-  
-    <div style="width: 185px; height = 100%; float: left; clear: left; padding: 15px" id="other-content">
-        <div style="width: 185px;">
-            Time frame: <div id="slider"></div>
-            <p><span id="query">0</span></p>
+
+    <div style="width: 250px; height = 100%; float: left; clear: left; padding: 15px" id="other-content">
+        <h3>Pipelines</h3>
+        <hr />
+        <div style="width: 210px;">
+            <h4>Time frame: </h4>
+            <div id="slider"></div>
+            <p style="margin-top: 10px;"><span id="query" class="text-info">0</span></p>
         </div>
-        <div style ="width: 185px;">
-            Weather Selectors:
+        <hr />
+        <div style ="width: 225px;">
+            <h4>Weather Selectors:</h4>
             <div style="display: block; padding-left: 15px;">
                 <form action="" id="WeatherForm">
                     <input type="radio" name="WeatherSelectors" value="DewPoint" onclick="update()" >Dew Point<br>
@@ -40,8 +45,9 @@
                 </form>
             </div>
         </div>
-        <div style ="width: 185px;">
-            Seismic Selectors:
+        <hr />
+        <div style ="width: 225px;">
+            <h4>Seismic Selectors:</h4>
             <div style="display: block; padding-left: 15px;">
                 <form action="" id="SeismicForm">
                     <input type="radio" name="SeismicSelectors" value="Magnitude" onclick="update()">Magnitude<br>
@@ -50,7 +56,7 @@
                     <input type="radio" name="SeismicSelectors" value="AffectedStations" onclick="update()">Affected Stations<br>
                     <input type="radio" name="SeismicSelectors" value="NoSelection" onclick="update()" checked>No Selection <br>
                 </form>
-            </div> 
+            </div>
         </div>
         <!-- <div style ="width: 185px;"> Not currently used
             Other Selectors:
@@ -59,11 +65,11 @@
                     <input type="radio" name="OtherSelectors" id="WeatherLayerSelector" onclick="update()">Weather<br>
                     <input type="radio" name="OtherSelectors" id="SeismicLayerSelector" onclick="update()">Seismic
                 </form>
-            </div> 
+            </div>
         </div> -->
     </div>
     <div id="map-div" style="height: 100%"></div>
-    
+
 
     <!-- Google Maps API -->
     <script src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
