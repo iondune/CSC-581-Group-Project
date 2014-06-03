@@ -26,7 +26,7 @@ var pointProgram;
 var pixelsToWebGLMatrix = new Float32Array(16);
 
 // WebGL arrays for each data source
-var dataSources;
+var dataSource;
 var dataValues = new Array();
 var currentDataSource = -1;
 var dataEntries; //Total number of entries in the data set
@@ -213,13 +213,13 @@ function loadDataSource()
             if (points.features[i].properties.temperature < tempMin)
                 tempMin = points.features[i].properties.temperature;
         }
-
-        dataSources =
+        //Load color temperature values, this will need a recalculation of max/min
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), tempMax);
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), tempMin);
+        dataSource =
         {
             'length': points.features.length,
-            'buffer': gl.createBuffer(),
-            'tempMin': tempMin,
-            'tempMax': tempMax
+            'buffer': gl.createBuffer()
         };
         console.debug("Resolving " + 0);
         data.resolve();
@@ -255,14 +255,10 @@ function pickDataSource(index)
     gl.enableVertexAttribArray(attributeLoc);
     gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, dataSources.buffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
-
-    //Load color temperature values, this will need a recalculation of max/min
-    gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataSources.tempMax);
-    gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataSources.tempMin);
     
-    dataSources.length = dataToDraw.length;
+    dataSource.length = dataToDraw.length;
 }
 
 function resize()
@@ -330,15 +326,15 @@ function update()
         var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
         gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
 
-        console.debug("Drawing " + dataSources.length + " points");
-        gl.drawArrays(gl.POINTS, 0, dataSources.length);
+        console.debug("Drawing " + dataSource.length + " points");
+        gl.drawArrays(gl.POINTS, 0, dataSource.length);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, glyphTexture);
         var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
         gl.uniform1i(samplerLoc, 0);
 
-        gl.drawArrays(gl.POINTS, 0, dataSources.length);
+        gl.drawArrays(gl.POINTS, 0, dataSource.length);
     }
     if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
