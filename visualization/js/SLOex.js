@@ -180,6 +180,11 @@ function loadDataSource()
                 'lon': pixel.x,
                 'lat': pixel.y,
                 'WindSpeed': points.features[i].properties.wind_speed,
+                'Rainfall': points.features[i].properties.precipitation,
+                'DewPoint': points.features[i].properties.dew_point,
+                'Visibility': points.features[i].properties.visibility,
+                'MaxWind': points.features[i].properties.max_wind_speed,
+                'AtmosphericPressure': points.features[i].properties.station_pressure,
                 'Temperature': points.features[i].properties.temperature,
                 'Day': dateVal.getDate()
             }
@@ -195,7 +200,8 @@ function loadDataSource()
         dataSource =
         {
             'length': points.features.length,
-            'buffer': gl.createBuffer()
+            'buffer': gl.createBuffer(),
+            'sizeBuffer': gl.createBuffer()
         };
         console.debug("Resolving " + 0);
         data.resolve();
@@ -293,12 +299,26 @@ function update()
         for(var i = 0; i < dataToDraw.length; i++)
         {
             if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] > sizeMax)
-                sizeMax = points.features[i].properties.temperature;
+                sizeMax = dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
             if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] < sizeMin)
-                sizeMin = points.features[i].properties.temperature;
+                sizeMin = dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
         }
+        var sizeData = new Float32Array(dataToDraw.length);
+        for(var i = 0; i < dataToDraw.length; i++)
+        {
+            sizeData[i] = ((dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 40 + 10;
+        }
+        //NEW STUFF
+        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.sizeBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, sizeData, gl.STATIC_DRAW);
 
-        gl.vertexAttrib1f(gl.aPointSize, 50);
+        //Send the data to shader
+        var attributeLoc = gl.getAttribLocation(pointProgram, 'aPointSize');
+        gl.enableVertexAttribArray(attributeLoc);
+        gl.vertexAttribPointer(attributeLoc, 1, gl.FLOAT, false, 0, 0);
+
+        //OLD THING
+        //gl.vertexAttrib1f(gl.aPointSize, 10 + 40 * );
 
         var mapMatrix = new Float32Array(16);
         mapMatrix.set(pixelsToWebGLMatrix);
