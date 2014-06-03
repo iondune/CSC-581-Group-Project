@@ -148,7 +148,7 @@ function loadData()
 
     $.when.apply($, loaded).done(function ()
     {
-        pickDataSource(0);
+        pickDataSource(1);
         canvasLayer.setUpdateHandler(update);
         update();
 
@@ -298,15 +298,21 @@ function update()
 
         for(var i = 0; i < dataToDraw.length; i++)
         {
-            if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] > sizeMax)
-                sizeMax = dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
-            if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] < sizeMin)
-                sizeMin = dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
+            if(dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] != null)
+            {
+                if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] > sizeMax)
+                    sizeMax = dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
+                if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] < sizeMin)
+                    sizeMin = dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
+            }
         }
         var sizeData = new Float32Array(dataToDraw.length);
         for(var i = 0; i < dataToDraw.length; i++)
         {
-            sizeData[i] = ((dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 40 + 10;
+            if(dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] != null)
+            {
+                sizeData[i] = ((dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 40 + 10;
+            }
         }
         //NEW STUFF
         gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.sizeBuffer);
