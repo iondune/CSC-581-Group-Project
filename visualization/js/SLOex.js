@@ -3,8 +3,8 @@
 // Configuration //
 ///////////////////
 
-//var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
-var pointFileURL = 'http://localhost:8000/js/data/';
+var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
+//var pointFileURL = 'http://localhost:8000/js/data/';
 
 /////////////
 // Globals //
@@ -194,12 +194,12 @@ function loadDataSource()
         var i;
         var tempMin = Infinity;
         var tempMax = -Infinity;
-        dataEntries = points.features.length;        
+        dataEntries = points.features.length;
         for(var i = 0; i < points.features.length; i++)
         {
             var pixel = LatLongToPixelXY(points.features[i].geometry.coordinates[1], points.features[i].geometry.coordinates[0]);
             var dateVal = new Date(points.features[i].properties.date);
-            dataValues[i] = 
+            dataValues[i] =
             {
                 'lon': pixel.x,
                 'lat': pixel.y,
@@ -230,7 +230,7 @@ function loadDataSource()
 function pickDataSource(index)
 {
     console.debug("Picking data source " + index);
-    
+
     var dataToDraw = [];
     //Go through all data to find which points are valid for the chosen day
     for (var i = 0; i < dataEntries; i++) {
@@ -257,7 +257,7 @@ function pickDataSource(index)
 
     gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
-    
+
     dataSource.length = dataToDraw.length;
 }
 
@@ -334,15 +334,14 @@ function update()
         var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
         gl.uniform1i(samplerLoc, 0);
 
-<<<<<<< HEAD
-        gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
+        gl.drawArrays(gl.POINTS, 0, dataSource.length);
 
-        var currentdate = new Date();
-        var timeLoc = gl.getUniformLocation(pointProgram, 'timer');
-        var timeVal = currentdate.getTime() / 999.0;
-        timeVal -= 1403231670;
-        //console.log(timeVal)
-        gl.uniform1f(timeLoc, timeVal * 8);
+        // var currentdate = new Date();
+        // var timeLoc = gl.getUniformLocation(pointProgram, 'timer');
+        // var timeVal = currentdate.getTime() / 999.0;
+        // timeVal -= 1403231670;
+        // console.log(timeVal)
+        // gl.uniform1f(timeLoc, timeVal * 8);
 
         //Matrix to transform arrow into "world space" aka lat/long coordinates
         var modelMatrix = new Float32Array(16);
@@ -357,9 +356,6 @@ function update()
         //gl.drawArrays(gl.TRIANGLES, 0, arrowPosBuf.numItems);
 
         //update();
-=======
-        gl.drawArrays(gl.POINTS, 0, dataSource.length);
->>>>>>> ae55edf8a1d4bc454561c6a352be48a432ca9a05
     }
     if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
@@ -382,7 +378,7 @@ $(function()
             update();
         }
 
-        setInterval(update, 15);
+        //setInterval(update, 15);
 
         $("#slider").slider({
             slide: refresh,
