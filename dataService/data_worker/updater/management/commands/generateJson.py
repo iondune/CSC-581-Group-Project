@@ -22,7 +22,8 @@ def generateJson():
     # summaries = Station.objects.all().order_by('?')[:15]
     # summaries = DailySummary.objects.all()
 
-    summaries = DailySummary.objects.all().order_by('?')[:20]
+    summaries = DailySummary.objects.all().order_by('station', 'wban')[:600]
+
     dicts = summaries.values()
     features = []
 
