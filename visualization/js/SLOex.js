@@ -3,8 +3,8 @@
 // Configuration //
 ///////////////////
 
-var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
-//var pointFileURL = 'http://localhost:8000/js/data/';
+//var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
+var pointFileURL = 'http://localhost:8000/js/data/';
 
 /////////////
 // Globals //
@@ -32,15 +32,13 @@ var currentDataSource = -1;
 var dataEntries; //Total number of entries in the data set
 var daysInMonth = 31;
 
-//Arrow buffers
-var arrowPosBuf
-
 // Data range
 var dataMax = -Infinity;
 var dataMin = Infinity;
 
 // Number of data files to load
 var dataFiles = 1;
+var dataToDraw = new Array();
 
 var glyphImage;
 var glyphTexture;
@@ -52,7 +50,6 @@ function init()
     initMap();
     initCanvas();
     initTextures();
-    initArrow();
 
     var load = $.Deferred();
     loadShaders().done(function ()
@@ -88,25 +85,6 @@ function initCanvas()
     // gl.enable(0x8642);
 }
 
-function initArrow()
-{
-    var vertices = [
-        -.5, -.5, 0,
-        .5, -.5, 0,
-        -.5, .25, 0,
-        .5, .25, 0,
-        -.75, .25, 0,
-        .75, .25, 0,
-        0, .5, 0
-    ];
-    arrowPosBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-    arrowPosBuf.itemSize = 3;
-    arrowPosBuf.numItems = 7;
-    console.debug("Arrow loaded");
-}
-
 function initTextures() {
     glyphTexture = gl.createTexture();
     glyphImage = new Image();
@@ -115,7 +93,6 @@ function initTextures() {
 }
 
 function handleTextureLoaded(image, texture) {
-    console.debug("Handling! ----------------");
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -186,9 +163,8 @@ function loadData()
 function loadDataSource()
 {
     var data = $.Deferred();
-    var url = pointFileURL + "goodData.json";
+    var url = pointFileURL + "weatherTemp.json";
 
-    console.debug("Loading the good file");
     $.getJSON(url, function(points)
     {
         var i;
@@ -203,7 +179,7 @@ function loadDataSource()
             {
                 'lon': pixel.x,
                 'lat': pixel.y,
-                'Wind Speed': points.features[i].properties.wind_speed,
+                'WindSpeed': points.features[i].properties.wind_speed,
                 'Temperature': points.features[i].properties.temperature,
                 'Day': dateVal.getDate()
             }
@@ -213,7 +189,7 @@ function loadDataSource()
             if (points.features[i].properties.temperature < tempMin)
                 tempMin = points.features[i].properties.temperature;
         }
-        //Load color temperature values, this will need a recalculation of max/min
+        //Load color temperature values
         gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), tempMax);
         gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), tempMin);
         dataSource =
@@ -231,7 +207,7 @@ function pickDataSource(index)
 {
     console.debug("Picking data source " + index);
 
-    var dataToDraw = [];
+    dataToDraw = [];
     //Go through all data to find which points are valid for the chosen day
     for (var i = 0; i < dataEntries; i++) {
         if (dataValues[i].Day == index)
@@ -249,14 +225,13 @@ function pickDataSource(index)
         rawData[i * 3 + 2] = dataToDraw[i].Temperature;
         console.debug("Adding point (" + dataToDraw[i].lon + ", " + dataToDraw[i].lat + ") Temp: " + dataToDraw[i].Temperature);
     }
+    gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
 
     //Send the data to shader
     var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
     gl.enableVertexAttribArray(attributeLoc);
     gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
 
     dataSource.length = dataToDraw.length;
 }
@@ -308,8 +283,18 @@ function update()
     gl.clear(gl.COLOR_BUFFER_BIT);
     if($("#WeatherForm input[type='radio']:checked").val() != "NoSelection")
     {
+        var sizeMin = Infinity;
+        var sizeMax = -Infinity;
         //Color represents temperature, size changes with value
-        console.debug("Drawing weather layer");
+        console.debug("Drawing " + $("#WeatherForm input[type='radio']:checked").val());
+
+        for(var i = 0; i < dataToDraw.length; i++)
+        {
+            if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] > sizeMax)
+                sizeMax = points.features[i].properties.temperature;
+            if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] < sizeMin)
+                sizeMin = points.features[i].properties.temperature;
+        }
         var pointSize = 10;
         gl.vertexAttrib1f(gl.aPointSize, Math.max(pointSize * map.zoom, 1.0));
         var mapMatrix = new Float32Array(16);
@@ -342,20 +327,6 @@ function update()
         // timeVal -= 1403231670;
         // console.log(timeVal)
         // gl.uniform1f(timeLoc, timeVal * 8);
-
-        //Matrix to transform arrow into "world space" aka lat/long coordinates
-        var modelMatrix = new Float32Array(16);
-        modelMatrix.set(pixelsToWebGLMatrix);
-        scaleMatrix(modelMatrix, 5, 5);
-        translateMatrix(modelMatrix, 35.292394, -120.661159);
-        var worldMatrixLoc = gl.getUniformLocation(pointProgram, 'modelMatrix');
-        gl.uniformMatrix4fv(worldMatrixLoc, false, modelMatrix);
-
-        //gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
-        //gl.vertexAttribPointer(pointProgram.worldCoord, arrowPosBuf.itemSize, gl.FLOAT, false, 0, 0);
-        //gl.drawArrays(gl.TRIANGLES, 0, arrowPosBuf.numItems);
-
-        //update();
     }
     if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
