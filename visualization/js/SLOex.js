@@ -3,8 +3,8 @@
 // Configuration //
 ///////////////////
 
-//var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
-var pointFileURL = 'http://localhost:8000/js/data/';
+var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
+//var pointFileURL = 'http://localhost:8000/js/data/';
 
 /////////////
 // Globals //
@@ -42,10 +42,16 @@ var dataMin = Infinity;
 // Number of data files to load
 var dataFiles = 1;
 
+var glyphImage;
+var glyphTexture;
+
+
+
 function init()
 {
     initMap();
     initCanvas();
+    initTextures();
     initArrow();
 
     var load = $.Deferred();
@@ -62,7 +68,7 @@ function init()
 function initMap()
 {
     var mapOptions = {
-      zoom: 16,
+      zoom: 6,
       center: new google.maps.LatLng(35.295, -120.67),
       mapTypeId: google.maps.MapTypeId.ROADMAP
     };
@@ -79,6 +85,7 @@ function initCanvas()
     };
     canvasLayer = new CanvasLayer(canvasLayerOptions);
     gl = canvasLayer.canvas.getContext('experimental-webgl');
+    // gl.enable(0x8642);
 }
 
 function initArrow()
@@ -98,6 +105,23 @@ function initArrow()
     arrowPosBuf.itemSize = 3;
     arrowPosBuf.numItems = 7;
     console.debug("Arrow loaded");
+}
+
+function initTextures() {
+    glyphTexture = gl.createTexture();
+    glyphImage = new Image();
+    glyphImage.onload = function() { handleTextureLoaded(glyphImage, glyphTexture); }
+    glyphImage.src = "img/doge.jpg";
+}
+
+function handleTextureLoaded(image, texture) {
+    console.debug("Handling! ----------------");
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 function loadShaders()
@@ -290,7 +314,8 @@ function update()
     {
         //Color represents temperature, size changes with value
         console.debug("Drawing weather layer");
-        gl.vertexAttrib1f(gl.aPointSize, Math.max(2.25 * map.zoom, 1.0));
+        var pointSize = 10;
+        gl.vertexAttrib1f(gl.aPointSize, Math.max(pointSize * map.zoom, 1.0));
         var mapMatrix = new Float32Array(16);
         mapMatrix.set(pixelsToWebGLMatrix);
 
@@ -304,15 +329,23 @@ function update()
 
         var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
         gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
+
         console.debug("Drawing " + dataSources.length + " points");
         gl.drawArrays(gl.POINTS, 0, dataSources.length);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, glyphTexture);
+        var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
+        gl.uniform1i(samplerLoc, 0);
+
+        gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
     }
     if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
         console.debug("Drawing seismic data");
         //Seismic data drawn fixed color, size varies with value
     }
-} 
+}
 
 $(function()
 {
