@@ -3,8 +3,8 @@
 // Configuration //
 ///////////////////
 
-var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
-//var pointFileURL = 'http://localhost:8000/js/data/';
+//var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
+var pointFileURL = 'http://localhost:8000/js/data/';
 
 /////////////
 // Globals //
@@ -26,8 +26,11 @@ var pointProgram;
 var pixelsToWebGLMatrix = new Float32Array(16);
 
 // WebGL arrays for each data source
-var dataSources = new Array();
+var dataSource;
+var dataValues = new Array();
 var currentDataSource = -1;
+var dataEntries; //Total number of entries in the data set
+var daysInMonth = 31;
 
 //Arrow buffers
 var arrowPosBuf
@@ -37,7 +40,7 @@ var dataMax = -Infinity;
 var dataMin = Infinity;
 
 // Number of data files to load
-var dataFiles = 5;
+var dataFiles = 1;
 
 var glyphImage;
 var glyphTexture;
@@ -50,7 +53,6 @@ function init()
     initCanvas();
     initTextures();
     initArrow();
-    newLoadDataSource(4)
 
     var load = $.Deferred();
     loadShaders().done(function ()
@@ -60,7 +62,6 @@ function init()
             load.resolve();
         })
     });
-
     return load;
 }
 
@@ -166,8 +167,7 @@ function loadData()
     noty({id: 'loading', text: "Loading data from " + dataFiles + " files...", layout: 'topCenter'});
 
     var loaded = [];
-    for (var i = 0; i < dataFiles - 1 ; i++)
-        loaded.push(loadDataSource(i));
+    loaded.push(loadDataSource());
 
     $.when.apply($, loaded).done(function ()
     {
@@ -183,100 +183,82 @@ function loadData()
     return data;
 }
 
-function newLoadDataSource(index)
+function loadDataSource()
 {
     var data = $.Deferred();
     var url = pointFileURL + "goodData.json";
 
+    console.debug("Loading the good file");
     $.getJSON(url, function(points)
     {
         var i;
         var tempMin = Infinity;
-        var tempMax = -Infinity
-        var rawData = new Float32Array(3 * points.features.length);
+        var tempMax = -Infinity;
+        dataEntries = points.features.length;        
         for(var i = 0; i < points.features.length; i++)
         {
             var pixel = LatLongToPixelXY(points.features[i].geometry.coordinates[1], points.features[i].geometry.coordinates[0]);
-            rawData[i * 3] = pixel.x;
-            rawData[i * 3 + 1] = pixel.y;
-            rawData[i * 3 + 2] = points.features[i].properties.temperature;
+            var dateVal = new Date(points.features[i].properties.date);
+            dataValues[i] = 
+            {
+                'lon': pixel.x,
+                'lat': pixel.y,
+                'Wind Speed': points.features[i].properties.wind_speed,
+                'Temperature': points.features[i].properties.temperature,
+                'Day': dateVal.getDate()
+            }
 
             if (points.features[i].properties.temperature > tempMax)
                 tempMax = points.features[i].properties.temperature;
             if (points.features[i].properties.temperature < tempMin)
                 tempMin = points.features[i].properties.temperature;
         }
-        dataSources[index] =
+        //Load color temperature values, this will need a recalculation of max/min
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), tempMax);
+        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), tempMin);
+        dataSource =
         {
             'length': points.features.length,
-            'buffer': gl.createBuffer(),
-            'tempMin': tempMin,
-            'tempMax' : tempMax
-        };
-        gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
-        console.debug("Resolving " + index);
-        data.resolve();
-    })
-}
-
-function loadDataSource(index)
-{
-    var data = $.Deferred();
-    var url = pointFileURL + "SLOPoints" + index + ".json";
-
-    console.debug("Loading from: " + url);
-    $.getJSON(url, function(points)
-    {
-        var rawData = new Float32Array(3 * points.length);
-        for (var i = 0; i < points.length; i++)
-        {
-            var pixel = LatLongToPixelXY(points[i].lat, points[i].lon);
-            rawData[i * 3] = pixel.x ;
-            rawData[i * 3 + 1] = pixel.y;
-            rawData[i * 3 + 2] = points[i].temp;
-
-            if (points[i].temp > dataMax)
-                dataMax = points[i].temp;
-            if (points[i].temp < dataMin)
-                dataMin = points[i].temp;
-        }
-
-        dataSources[index] =
-        {
-            'length': points.length,
             'buffer': gl.createBuffer()
         };
-        gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
-        console.debug("Resolving " + index);
+        console.debug("Resolving " + 0);
         data.resolve();
-    });
-
+    })
     return data;
 }
 
 function pickDataSource(index)
 {
     console.debug("Picking data source " + index);
-    console.debug("Drawing " + dataSources[index].length + " points");
-    if(index == dataFiles - 1)
-    {
-        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataSources[index].tempMax);
-        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataSources[index].tempMin);
+    
+    var dataToDraw = [];
+    //Go through all data to find which points are valid for the chosen day
+    for (var i = 0; i < dataEntries; i++) {
+        if (dataValues[i].Day == index)
+        {
+            dataToDraw.push(dataValues[i]);
+        }
     }
-    else
+
+    //Put the necessary data into a buffer
+    var rawData = new Float32Array(3 * dataToDraw.length);
+    for(var i = 0; i < dataToDraw.length; i++)
     {
-        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), dataMax);
-        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), dataMin);
+        rawData[i * 3] = dataToDraw[i].lon;
+        rawData[i * 3 + 1] = dataToDraw[i].lat;
+        rawData[i * 3 + 2] = dataToDraw[i].Temperature;
+        console.debug("Adding point (" + dataToDraw[i].lon + ", " + dataToDraw[i].lat + ") Temp: " + dataToDraw[i].Temperature);
     }
-    gl.bindBuffer(gl.ARRAY_BUFFER, dataSources[index].buffer);
+
+    //Send the data to shader
     var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
     gl.enableVertexAttribArray(attributeLoc);
     gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
-    //Load color temperature values, this if check is temporary
 
-    currentDataSource = index;
+    gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
+    
+    dataSource.length = dataToDraw.length;
 }
 
 function resize()
@@ -344,12 +326,15 @@ function update()
         var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
         gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
 
+        console.debug("Drawing " + dataSource.length + " points");
+        gl.drawArrays(gl.POINTS, 0, dataSource.length);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, glyphTexture);
         var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
         gl.uniform1i(samplerLoc, 0);
 
+<<<<<<< HEAD
         gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
 
         var currentdate = new Date();
@@ -372,6 +357,9 @@ function update()
         //gl.drawArrays(gl.TRIANGLES, 0, arrowPosBuf.numItems);
 
         //update();
+=======
+        gl.drawArrays(gl.POINTS, 0, dataSource.length);
+>>>>>>> ae55edf8a1d4bc454561c6a352be48a432ca9a05
     }
     if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
@@ -385,7 +373,7 @@ $(function()
     init().done(function ()
     {
         console.debug("Initializing slider...");
-
+        currentDataSource = 1;
         function refresh(event, ui)
         {
             time = ui.value;
@@ -398,10 +386,10 @@ $(function()
 
         $("#slider").slider({
             slide: refresh,
-            min: 0,
-            max: dataFiles - 1,
+            min: 1,
+            max: daysInMonth,
             step: 1,
-            value: 0
+            value: 1
         });
     });
 });
