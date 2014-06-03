@@ -293,6 +293,7 @@ function translateMatrix(matrix, tx, ty)
 
 function update()
 {
+    canvasLayer.resizeMe();
     if (currentDataSource == -1)
     {
         console.debug("Aborting draw, data not yet loaded.");
