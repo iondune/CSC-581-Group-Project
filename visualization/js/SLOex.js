@@ -311,8 +311,7 @@ function update()
     {
         //Color represents temperature, size changes with value
         console.debug("Drawing weather layer");
-        var pointSize = 10;
-        gl.vertexAttrib1f(gl.aPointSize, Math.max(pointSize * map.zoom, 1.0));
+        gl.vertexAttrib1f(gl.aPointSize, 50);
         var mapMatrix = new Float32Array(16);
         mapMatrix.set(pixelsToWebGLMatrix);
 
