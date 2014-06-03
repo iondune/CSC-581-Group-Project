@@ -30,10 +30,11 @@
             <div id="slider"></div>
             <p style="margin-top: 10px;" class="text-info">Day <span id="query">1</span></p>
         </div>
-        <hr />
-        <div style ="width: 225px;">
-            <h4>Weather Selectors:</h4>
-            <div style="display: block; padding-left: 15px;">
+        <div style ="width: 225px;" class="panel panel-primary">
+            <div class="panel-heading">
+                <h4 class="panel-title">Weather Selectors:</h4>
+            </div>
+            <div style="display: block; padding-left: 15px;" class="panel-body">
                 <form action="" id="WeatherForm">
                     <input type="radio" name="WeatherSelectors" value="DewPoint" onclick="update()"> Dew Point<br>
                     <input type="radio" name="WeatherSelectors" value="AtmosphericPressure" onclick="update()"> Atmospheric Pressure<br>
@@ -45,10 +46,11 @@
                 </form>
             </div>
         </div>
-        <hr />
-        <div style ="width: 225px;">
-            <h4>Seismic Selectors:</h4>
-            <div style="display: block; padding-left: 15px;">
+        <div style ="width: 225px;" class="panel panel-primary">
+            <div class="panel-heading">
+                <h4 class="panel-title">Seismic Selectors:</h4>
+            </div>
+            <div style="display: block; padding-left: 15px;" class="panel-body">
                 <form action="" id="SeismicForm">
                     <input type="radio" name="SeismicSelectors" value="Magnitude" onclick="update()"> Magnitude<br>
                     <input type="radio" name="SeismicSelectors" value="Depth" onclick="update()"> Depth<br>
