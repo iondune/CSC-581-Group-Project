@@ -352,6 +352,13 @@ function update()
 
         gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
 
+        var currentdate = new Date();
+        var timeLoc = gl.getUniformLocation(pointProgram, 'timer');
+        var timeVal = currentdate.getTime() / 999.0;
+        timeVal -= 1403231670;
+        //console.log(timeVal)
+        gl.uniform1f(timeLoc, timeVal * 8);
+
         //Matrix to transform arrow into "world space" aka lat/long coordinates
         var modelMatrix = new Float32Array(16);
         modelMatrix.set(pixelsToWebGLMatrix);
@@ -363,6 +370,8 @@ function update()
         //gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
         //gl.vertexAttribPointer(pointProgram.worldCoord, arrowPosBuf.itemSize, gl.FLOAT, false, 0, 0);
         //gl.drawArrays(gl.TRIANGLES, 0, arrowPosBuf.numItems);
+
+        //update();
     }
     if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
@@ -384,6 +393,8 @@ $(function()
             pickDataSource(time);
             update();
         }
+
+        setInterval(update, 15);
 
         $("#slider").slider({
             slide: refresh,
