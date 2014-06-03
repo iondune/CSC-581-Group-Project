@@ -268,6 +268,7 @@ function translateMatrix(matrix, tx, ty)
 
 function update()
 {
+    canvasLayer.resizeMe();
     if (currentDataSource == -1)
     {
         console.debug("Aborting draw, data not yet loaded.");
@@ -286,6 +287,7 @@ function update()
         var sizeMin = Infinity;
         var sizeMax = -Infinity;
         //Color represents temperature, size changes with value
+
         console.debug("Drawing " + $("#WeatherForm input[type='radio']:checked").val());
 
         for(var i = 0; i < dataToDraw.length; i++)
@@ -295,8 +297,9 @@ function update()
             if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] < sizeMin)
                 sizeMin = points.features[i].properties.temperature;
         }
-        var pointSize = 10;
-        gl.vertexAttrib1f(gl.aPointSize, Math.max(pointSize * map.zoom, 1.0));
+
+        gl.vertexAttrib1f(gl.aPointSize, 50);
+
         var mapMatrix = new Float32Array(16);
         mapMatrix.set(pixelsToWebGLMatrix);
 

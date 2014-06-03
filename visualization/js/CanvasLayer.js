@@ -327,7 +327,7 @@ CanvasLayer.prototype.onAdd = function() {
   this.setPane_();
 
   this.resizeListener_ = google.maps.event.addListener(this.getMap(),
-      'resize', this.resizeFunction_);
+      'resize', function() {console.debug("hey, callback!");});
   this.centerListener_ = google.maps.event.addListener(this.getMap(),
       'center_changed', this.repositionFunction_);
 
@@ -363,6 +363,10 @@ CanvasLayer.prototype.onRemove = function() {
     this.requestAnimationFrameId_ = null;
   }
 };
+
+CanvasLayer.prototype.resizeMe = function() {
+  this.resize_();
+}
 
 /**
  * The internal callback for resize events that resizes the canvas to keep the
