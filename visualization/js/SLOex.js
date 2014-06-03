@@ -3,8 +3,8 @@
 // Configuration //
 ///////////////////
 
-var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
-//var pointFileURL = 'http://localhost:8000/js/data/';
+//var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
+var pointFileURL = 'http://localhost:8000/js/data/';
 
 /////////////
 // Globals //
@@ -338,7 +338,7 @@ function update()
         var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
         gl.uniform1i(samplerLoc, 0);
 
-        gl.drawArrays(gl.POINTS, 0, dataSources[currentDataSource].length);
+        gl.drawArrays(gl.POINTS, 0, dataSources.length);
     }
     if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
