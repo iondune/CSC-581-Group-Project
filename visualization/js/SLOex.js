@@ -3,7 +3,7 @@
 // Configuration //
 ///////////////////
 
-//var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
+// var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
 var pointFileURL = 'http://localhost:8000/js/data/';
 
 /////////////
@@ -205,6 +205,8 @@ function loadDataSource()
         };
         console.debug("Resolving " + 0);
         data.resolve();
+        $("#left-key").text(tempMin);
+        $("#right-key").text(tempMax);
     })
     return data;
 }
