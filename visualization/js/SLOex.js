@@ -163,7 +163,7 @@ function loadData()
 function loadDataSource()
 {
     var data = $.Deferred();
-    var url = pointFileURL + "weatherTemp.json";
+    var url = pointFileURL + "weather500.json";
 
     $.getJSON(url, function(points)
     {
