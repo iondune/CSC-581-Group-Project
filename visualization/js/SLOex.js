@@ -82,14 +82,16 @@ function initCanvas()
     };
     canvasLayer = new CanvasLayer(canvasLayerOptions);
     gl = canvasLayer.canvas.getContext('experimental-webgl');
-    // gl.enable(0x8642);
+
+    gl.enable(gl.BLEND);
+    // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 }
 
 function initTextures() {
     glyphTexture = gl.createTexture();
     glyphImage = new Image();
     glyphImage.onload = function() { handleTextureLoaded(glyphImage, glyphTexture); }
-    glyphImage.src = "img/doge.jpg";
+    glyphImage.src = "img/Glyph.png";
 }
 
 function handleTextureLoaded(image, texture) {
