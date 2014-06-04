@@ -84,7 +84,8 @@ function initCanvas()
     gl = canvasLayer.canvas.getContext('experimental-webgl');
 
     gl.enable(gl.BLEND);
-    // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.DEPTH_TEST);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 }
 
 function initTextures() {
@@ -276,6 +277,8 @@ function translateMatrix(matrix, tx, ty)
     matrix[15] += matrix[3]*tx + matrix[7]*ty;
 }
 
+var firstTime = true;
+
 function update()
 {
     canvasLayer.resizeMe();
@@ -353,6 +356,12 @@ function update()
         gl.uniform1i(samplerLoc, 0);
 
         gl.drawArrays(gl.POINTS, 0, dataSource.length);
+
+        if (firstTime)
+        {
+            firstTime = false;
+            update();
+        }
 
         // var currentdate = new Date();
         // var timeLoc = gl.getUniformLocation(pointProgram, 'timer');
