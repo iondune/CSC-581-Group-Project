@@ -38,10 +38,15 @@ var dataMin = Infinity;
 
 // Number of data files to load
 var dataFiles = 1;
-var dataToDraw = new Array();
+var weatherDataToDraw = new Array();
+var rawWeatherData;
+var seismicDataToDraw = new Array();
+var rawSeismicData;
 
-var glyphImage;
-var glyphTexture;
+var glyphWeatherImage;
+var glyphWeatherTexture;
+var glyphSeismicImage;
+var glyphSeismicTexture;
 
 
 
@@ -89,10 +94,17 @@ function initCanvas()
 }
 
 function initTextures() {
-    glyphTexture = gl.createTexture();
-    glyphImage = new Image();
-    glyphImage.onload = function() { handleTextureLoaded(glyphImage, glyphTexture); }
-    glyphImage.src = "img/Glyph.png";
+    //Weather
+    glyphWeatherTexture = gl.createTexture();
+    glyphWeatherImage = new Image();
+    glyphWeatherImage.onload = function() { handleTextureLoaded(glyphWeatherImage, glyphWeatherTexture); }
+    glyphWeatherImage.src = "img/Glyph.png";
+
+    //Seismic
+    glyphSeismicTexture = gl.createTexture();
+    glyphSeismicImage = new Image();
+    glyphSeismicImage.onload = function() { handleTextureLoaded(glyphSeismicImage, glyphSeismicTexture); }
+    glyphSeismicImage.src = "img/Earthquake.png";
 }
 
 function handleTextureLoaded(image, texture) {
@@ -180,8 +192,11 @@ function loadDataSource()
             var dateVal = new Date(points.features[i].properties.date);
             dataValues[i] =
             {
+                //Standard
                 'lon': pixel.x,
                 'lat': pixel.y,
+                'Day': dateVal.getDate(),
+                //Weather
                 'WindSpeed': points.features[i].properties.wind_speed,
                 'Rainfall': points.features[i].properties.precipitation,
                 'DewPoint': points.features[i].properties.dew_point,
@@ -189,22 +204,38 @@ function loadDataSource()
                 'MaxWind': points.features[i].properties.max_wind_speed,
                 'AtmosphericPressure': points.features[i].properties.station_pressure,
                 'Temperature': points.features[i].properties.temperature,
-                'Day': dateVal.getDate()
+                //Seismic
+                'Magnitude': points.features[i].properties.magnitude,
+                'Depth': points.features[i].geometry.coordinates[2],
+                'Significance': points.features[i].properties.magnitude,
+                'AffectedStations': points.features[i].properties.magnitude
+    
             }
-
-            if (points.features[i].properties.temperature > tempMax)
-                tempMax = points.features[i].properties.temperature;
-            if (points.features[i].properties.temperature < tempMin)
-                tempMin = points.features[i].properties.temperature;
+            if(points.features[i].properties.hasOwnProperty('temperature'))
+            {
+                if (points.features[i].properties.temperature > tempMax)
+                    tempMax = points.features[i].properties.temperature;
+                if (points.features[i].properties.temperature < tempMin)
+                    tempMin = points.features[i].properties.temperature;
+                dataValues[i].isWeather = true;
+            }
+            else
+                dataValues[i].isWeather = false;
         }
         //Load color temperature values
-        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), tempMax);
-        gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), tempMin);
+        if(tempMin != Infinity)
+        {
+            gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), tempMax);
+            gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), tempMin);
+        }
         dataSource =
         {
             'weatherLength': points.features.length,
             'weatherBuffer': gl.createBuffer(),
-            'weatherSizeBuffer': gl.createBuffer()
+            'weatherSizeBuffer': gl.createBuffer(),
+            'seismicLength': points.features.length,
+            'seismicBuffer': gl.createBuffer(),
+            'seismicSizeBuffer': gl.createBuffer()
         };
         console.debug("Resolving " + 0);
         data.resolve();
@@ -218,32 +249,38 @@ function pickDataSource(index)
 {
     console.debug("Picking data source " + index);
 
-    dataToDraw = [];
+    weatherDataToDraw = [];
+    seismicDataToDraw = []
     //Go through all data to find which points are valid for the chosen day
     for (var i = 0; i < dataEntries; i++) {
         if (dataValues[i].Day == index)
         {
-            dataToDraw.push(dataValues[i]);
+            if(dataValues[i].isWeather)
+                weatherDataToDraw.push(dataValues[i]);
+            else
+                seismicDataToDraw.push(dataValues[i]);
         }
     }
 
-    //Put the necessary data into a buffer
-    var rawData = new Float32Array(3 * dataToDraw.length);
-    for(var i = 0; i < dataToDraw.length; i++)
+    //Put the necessary weather data into a buffer
+    rawWeatherData = new Float32Array(3 * weatherDataToDraw.length);
+    for(var i = 0; i < weatherDataToDraw.length; i++)
     {
-        rawData[i * 3] = dataToDraw[i].lon;
-        rawData[i * 3 + 1] = dataToDraw[i].lat;
-        rawData[i * 3 + 2] = dataToDraw[i].Temperature;
+        rawWeatherData[i * 3] = weatherDataToDraw[i].lon;
+        rawWeatherData[i * 3 + 1] = weatherDataToDraw[i].lat;
+        rawWeatherData[i * 3 + 2] = weatherDataToDraw[i].Temperature;
     }
-    gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.weatherBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
 
-    //Send the data to shader
-    var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
-    gl.enableVertexAttribArray(attributeLoc);
-    gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
+    //Put the necessary seismic data into a buffer
+    rawSeismicData = new Float32Array(3 * seismicDataToDraw.length);
+    for(var i = 0; i < seismicDataToDraw.length; i++)
+    {
+        rawSeismicData[i * 3] = seismicDataToDraw[i].lon;
+        rawSeismicData[i * 3 + 1] = seismicDataToDraw[i].lat;
+    }
 
-    dataSource.weatherLength = dataToDraw.length;
+    dataSource.weatherLength = weatherDataToDraw.length;
+    dataSource.seismicLength = seismicDataToDraw.length;
 }
 
 function resize()
@@ -293,6 +330,8 @@ function update()
         return;
     }
 
+    
+
     gl.clear(gl.COLOR_BUFFER_BIT);
     if($("#WeatherForm input[type='radio']:checked").val() != "NoSelection")
     {
@@ -302,29 +341,41 @@ function update()
 
         console.debug("Drawing " + $("#WeatherForm input[type='radio']:checked").val());
 
-        for(var i = 0; i < dataToDraw.length; i++)
+        for(var i = 0; i < weatherDataToDraw.length; i++)
         {
-            if(dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] != null)
+            if(weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] != null)
             {
-                if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] > sizeMax)
-                    sizeMax = dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
-                if (dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] < sizeMin)
-                    sizeMin = dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
+                if (weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] > sizeMax)
+                    sizeMax = weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
+                if (weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] < sizeMin)
+                    sizeMin = weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
             }
         }
-        var sizeData = new Float32Array(dataToDraw.length);
-        for(var i = 0; i < dataToDraw.length; i++)
+        var sizeData = new Float32Array(weatherDataToDraw.length);
+        for(var i = 0; i < weatherDataToDraw.length; i++)
         {
-            if(dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] != null)
+            if(weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] != null)
             {
-                sizeData[i] = ((dataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 40 + 10;
+                sizeData[i] = ((weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 40 + 10;
             }
         }
-        //NEW STUFF
+
+        //Send position data
+        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.weatherBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, rawWeatherData, gl.STATIC_DRAW);
+        var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
+        gl.enableVertexAttribArray(attributeLoc);
+        gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
+
+        //Send size data
         gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.weatherSizeBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, sizeData, gl.STATIC_DRAW);
 
-        //Send the data to shader
+    
+        //Tell the shader it's drawing weather data
+        gl.uniform1i(gl.getUniformLocation(pointProgram, 'weatherDraw'), 1);
+
+        //Set up GL stuff
         var attributeLoc = gl.getAttribLocation(pointProgram, 'aPointSize');
         gl.enableVertexAttribArray(attributeLoc);
         gl.vertexAttribPointer(attributeLoc, 1, gl.FLOAT, false, 0, 0);
@@ -337,16 +388,13 @@ function update()
 
         var mapProjection = map.getProjection();
         var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
-        //console.debug("Top left @ (" + offset.x + ", " + offset.y + ")");
         translateMatrix(mapMatrix, -offset.x, -offset.y);
 
         var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
         gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
 
-        //gl.drawArrays(gl.POINTS, 0, dataSource.weatherLength);
-
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, glyphTexture);
+        gl.bindTexture(gl.TEXTURE_2D, glyphWeatherTexture);
         var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
         gl.uniform1i(samplerLoc, 0);
 
@@ -357,18 +405,77 @@ function update()
             firstTime = false;
             update();
         }
-
-        // var currentdate = new Date();
-        // var timeLoc = gl.getUniformLocation(pointProgram, 'timer');
-        // var timeVal = currentdate.getTime() / 999.0;
-        // timeVal -= 1403231670;
-        // console.log(timeVal)
-        // gl.uniform1f(timeLoc, timeVal * 8);
     }
     if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
     {
-        console.debug("Drawing seismic data");
         //Seismic data drawn fixed color, size varies with value
+        var sizeMin = Infinity;
+        var sizeMax = -Infinity;
+
+        console.debug("Drawing " + $("#SeismicForm input[type='radio']:checked").val());
+
+        for(var i = 0; i < seismicDataToDraw.length; i++)
+        {
+            if(seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] != null)
+            {
+                if (seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] > sizeMax)
+                    sizeMax = seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()];
+                if (seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] < sizeMin)
+                    sizeMin = seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()];
+            }
+        }
+        var sizeData = new Float32Array(seismicDataToDraw.length);
+        for(var i = 0; i < seismicDataToDraw.length; i++)
+        {
+            if(seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] != null)
+            {
+                sizeData[i] = ((seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 40 + 10;
+            }
+        }
+        //Send position data
+        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.seismicBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, rawSeismicData, gl.STATIC_DRAW);
+        var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
+        gl.enableVertexAttribArray(attributeLoc);
+        gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
+
+        //Send size data
+        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.seismicSizeBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, sizeData, gl.STATIC_DRAW);
+
+        //Tell the shader its drawing seismic data
+        gl.uniform1i(gl.getUniformLocation(pointProgram, 'weatherDraw'), 0);
+
+        //Set up GL stuff
+        var attributeLoc = gl.getAttribLocation(pointProgram, 'aPointSize');
+        gl.enableVertexAttribArray(attributeLoc);
+        gl.vertexAttribPointer(attributeLoc, 1, gl.FLOAT, false, 0, 0);
+
+        var mapMatrix = new Float32Array(16);
+        mapMatrix.set(pixelsToWebGLMatrix);
+
+        var scale = Math.pow(2, map.zoom);
+        scaleMatrix(mapMatrix, scale, scale);
+
+        var mapProjection = map.getProjection();
+        var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
+        translateMatrix(mapMatrix, -offset.x, -offset.y);
+
+        var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
+        gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, glyphSeismicTexture);
+        var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
+        gl.uniform1i(samplerLoc, 0);
+
+        gl.drawArrays(gl.POINTS, 0, dataSource.seismicLength);
+
+        if (firstTime)
+        {
+            firstTime = false;
+            update();
+        }
     }
 }
 
