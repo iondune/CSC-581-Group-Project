@@ -4,7 +4,8 @@
 ///////////////////
 
 // var pointFileURL = 'http://equinox.iondune.net/pipelines/js/data/';
-var pointFileURL = 'http://localhost:8000/js/data/';
+//var pointFileURL = 'http://localhost:8000/js/data/';
+var pointFileURL = '/js/data/';
 
 /////////////
 // Globals //
@@ -29,7 +30,7 @@ var pixelsToWebGLMatrix = new Float32Array(16);
 var dataSource;
 var dataValues = new Array();
 var currentDataSource = -1;
-var dataEntries; //Total number of entries in the data set
+var dataEntries = 0; //Total number of entries in the data set
 var daysInMonth = 31;
 
 // Data range
@@ -159,8 +160,8 @@ function loadData()
     noty({id: 'loading', text: "Loading data from " + dataFiles + " files...", layout: 'topCenter'});
 
     var loaded = [];
-    loaded.push(loadDataSource());
-
+    loaded.push(loadDataSource(0));
+    loaded.push(loadDataSource(1));
     $.when.apply($, loaded).done(function ()
     {
         pickDataSource(1);
@@ -175,22 +176,27 @@ function loadData()
     return data;
 }
 
-function loadDataSource()
+function loadDataSource(index)
 {
     var data = $.Deferred();
-    var url = pointFileURL + "weather500.json";
+
+    if(index == 0)
+        var url = pointFileURL + "weather500.json";
+    else
+        var url = pointFileURL + "seismic.json";
 
     $.getJSON(url, function(points)
     {
         var i;
+        var index = dataEntries;
         var tempMin = Infinity;
         var tempMax = -Infinity;
-        dataEntries = points.features.length;
+        dataEntries += points.features.length;
         for(var i = 0; i < points.features.length; i++)
         {
             var pixel = LatLongToPixelXY(points.features[i].geometry.coordinates[1], points.features[i].geometry.coordinates[0]);
             var dateVal = new Date(points.features[i].properties.date);
-            dataValues[i] =
+            dataValues[index] =
             {
                 //Standard
                 'lon': pixel.x,
@@ -206,9 +212,9 @@ function loadDataSource()
                 'Temperature': points.features[i].properties.temperature,
                 //Seismic
                 'Magnitude': points.features[i].properties.magnitude,
-                'Depth': points.features[i].geometry.coordinates[2],
-                'Significance': points.features[i].properties.magnitude,
-                'AffectedStations': points.features[i].properties.magnitude
+                'Depth': points.features[i].properties.depth,
+                'Significance': points.features[i].properties.significance,
+                'AffectedStations': points.features[i].properties.affected_stations
     
             }
             if(points.features[i].properties.hasOwnProperty('temperature'))
@@ -217,16 +223,21 @@ function loadDataSource()
                     tempMax = points.features[i].properties.temperature;
                 if (points.features[i].properties.temperature < tempMin)
                     tempMin = points.features[i].properties.temperature;
-                dataValues[i].isWeather = true;
+                dataValues[index].isWeather = true;
             }
             else
-                dataValues[i].isWeather = false;
+            {
+                dataValues[index].isWeather = false;
+            }
+            index++;
         }
         //Load color temperature values
         if(tempMin != Infinity)
         {
-            gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), tempMax);
-            gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), tempMin);
+            gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMax'), tempMax + 25);
+            gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), tempMin - 15);
+            $("#left-key").text(tempMin);
+            $("#right-key").text(tempMax);
         }
         dataSource =
         {
@@ -237,10 +248,9 @@ function loadDataSource()
             'seismicBuffer': gl.createBuffer(),
             'seismicSizeBuffer': gl.createBuffer()
         };
-        console.debug("Resolving " + 0);
+        console.debug("Resolving " + index);
         data.resolve();
-        $("#left-key").text(tempMin);
-        $("#right-key").text(tempMax);
+        
     })
     return data;
 }
@@ -250,15 +260,20 @@ function pickDataSource(index)
     console.debug("Picking data source " + index);
 
     weatherDataToDraw = [];
-    seismicDataToDraw = []
+    seismicDataToDraw = [];
     //Go through all data to find which points are valid for the chosen day
     for (var i = 0; i < dataEntries; i++) {
         if (dataValues[i].Day == index)
         {
-            if(dataValues[i].isWeather)
+            if(dataValues[i].isWeather == true)
+            {
                 weatherDataToDraw.push(dataValues[i]);
+            }
             else
+            {
+                console.debug("FOUND SEISMIC");
                 seismicDataToDraw.push(dataValues[i]);
+            }
         }
     }
 
@@ -272,6 +287,7 @@ function pickDataSource(index)
     }
 
     //Put the necessary seismic data into a buffer
+    console.debug("This day has " + seismicDataToDraw.length + " points");
     rawSeismicData = new Float32Array(3 * seismicDataToDraw.length);
     for(var i = 0; i < seismicDataToDraw.length; i++)
     {
@@ -330,9 +346,81 @@ function update()
         return;
     }
 
-    
-
     gl.clear(gl.COLOR_BUFFER_BIT);
+
+    if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
+    {
+        //Seismic data drawn fixed color, size varies with value
+        var sizeMin = Infinity;
+        var sizeMax = -Infinity;
+
+        console.debug("Drawing " + $("#SeismicForm input[type='radio']:checked").val());
+
+        for(var i = 0; i < seismicDataToDraw.length; i++)
+        {
+            if(seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] != null)
+            {
+                if (seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] > sizeMax)
+                    sizeMax = seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()];
+                if (seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] < sizeMin)
+                    sizeMin = seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()];
+            }
+        }
+        var sizeData = new Float32Array(seismicDataToDraw.length);
+        for(var i = 0; i < seismicDataToDraw.length; i++)
+        {
+            if(seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] != null)
+            {
+                sizeData[i] = ((seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 60 + 10;
+            }
+        }
+        //Send position data
+        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.seismicBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, rawSeismicData, gl.STATIC_DRAW);
+
+        console.debug("Drawing " + dataSource.seismicLength + " values");
+        var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
+        gl.enableVertexAttribArray(attributeLoc);
+        gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
+
+        //Send size data
+        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.seismicSizeBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, sizeData, gl.STATIC_DRAW);
+
+        //Tell the shader its drawing seismic data
+        gl.uniform1i(gl.getUniformLocation(pointProgram, 'weatherDraw'), 0);
+
+        //Set up GL stuff
+        var attributeLoc = gl.getAttribLocation(pointProgram, 'aPointSize');
+        gl.enableVertexAttribArray(attributeLoc);
+        gl.vertexAttribPointer(attributeLoc, 1, gl.FLOAT, false, 0, 0);
+
+        var mapMatrix = new Float32Array(16);
+        mapMatrix.set(pixelsToWebGLMatrix);
+
+        var scale = Math.pow(2, map.zoom);
+        scaleMatrix(mapMatrix, scale, scale);
+
+        var mapProjection = map.getProjection();
+        var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
+        translateMatrix(mapMatrix, -offset.x, -offset.y);
+
+        var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
+        gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, glyphSeismicTexture);
+        var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
+        gl.uniform1i(samplerLoc, 0);
+
+        gl.drawArrays(gl.POINTS, 0, dataSource.seismicLength);
+
+        if (firstTime)
+        {
+            firstTime = false;
+            update();
+        }
+    }
     if($("#WeatherForm input[type='radio']:checked").val() != "NoSelection")
     {
         var sizeMin = Infinity;
@@ -405,78 +493,7 @@ function update()
             firstTime = false;
             update();
         }
-    }
-    if($("#SeismicForm input[type='radio']:checked").val() != 'NoSelection')
-    {
-        //Seismic data drawn fixed color, size varies with value
-        var sizeMin = Infinity;
-        var sizeMax = -Infinity;
-
-        console.debug("Drawing " + $("#SeismicForm input[type='radio']:checked").val());
-
-        for(var i = 0; i < seismicDataToDraw.length; i++)
-        {
-            if(seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] != null)
-            {
-                if (seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] > sizeMax)
-                    sizeMax = seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()];
-                if (seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] < sizeMin)
-                    sizeMin = seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()];
-            }
-        }
-        var sizeData = new Float32Array(seismicDataToDraw.length);
-        for(var i = 0; i < seismicDataToDraw.length; i++)
-        {
-            if(seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] != null)
-            {
-                sizeData[i] = ((seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 40 + 10;
-            }
-        }
-        //Send position data
-        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.seismicBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, rawSeismicData, gl.STATIC_DRAW);
-        var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
-        gl.enableVertexAttribArray(attributeLoc);
-        gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
-
-        //Send size data
-        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.seismicSizeBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, sizeData, gl.STATIC_DRAW);
-
-        //Tell the shader its drawing seismic data
-        gl.uniform1i(gl.getUniformLocation(pointProgram, 'weatherDraw'), 0);
-
-        //Set up GL stuff
-        var attributeLoc = gl.getAttribLocation(pointProgram, 'aPointSize');
-        gl.enableVertexAttribArray(attributeLoc);
-        gl.vertexAttribPointer(attributeLoc, 1, gl.FLOAT, false, 0, 0);
-
-        var mapMatrix = new Float32Array(16);
-        mapMatrix.set(pixelsToWebGLMatrix);
-
-        var scale = Math.pow(2, map.zoom);
-        scaleMatrix(mapMatrix, scale, scale);
-
-        var mapProjection = map.getProjection();
-        var offset = mapProjection.fromLatLngToPoint(canvasLayer.getTopLeft());
-        translateMatrix(mapMatrix, -offset.x, -offset.y);
-
-        var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
-        gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, glyphSeismicTexture);
-        var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
-        gl.uniform1i(samplerLoc, 0);
-
-        gl.drawArrays(gl.POINTS, 0, dataSource.seismicLength);
-
-        if (firstTime)
-        {
-            firstTime = false;
-            update();
-        }
-    }
+    }   
 }
 
 $(function()
@@ -485,6 +502,7 @@ $(function()
     {
         console.debug("Initializing slider...");
         currentDataSource = 1;
+        update();
         function refresh(event, ui)
         {
             time = ui.value;
