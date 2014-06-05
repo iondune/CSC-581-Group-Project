@@ -202,9 +202,9 @@ function loadDataSource()
         gl.uniform1f(gl.getUniformLocation(pointProgram, 'dataMin'), tempMin);
         dataSource =
         {
-            'length': points.features.length,
-            'buffer': gl.createBuffer(),
-            'sizeBuffer': gl.createBuffer()
+            'weatherLength': points.features.length,
+            'weatherBuffer': gl.createBuffer(),
+            'weatherSizeBuffer': gl.createBuffer()
         };
         console.debug("Resolving " + 0);
         data.resolve();
@@ -234,9 +234,8 @@ function pickDataSource(index)
         rawData[i * 3] = dataToDraw[i].lon;
         rawData[i * 3 + 1] = dataToDraw[i].lat;
         rawData[i * 3 + 2] = dataToDraw[i].Temperature;
-        console.debug("Adding point (" + dataToDraw[i].lon + ", " + dataToDraw[i].lat + ") Temp: " + dataToDraw[i].Temperature);
     }
-    gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.buffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.weatherBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, rawData, gl.STATIC_DRAW);
 
     //Send the data to shader
@@ -244,7 +243,7 @@ function pickDataSource(index)
     gl.enableVertexAttribArray(attributeLoc);
     gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
 
-    dataSource.length = dataToDraw.length;
+    dataSource.weatherLength = dataToDraw.length;
 }
 
 function resize()
@@ -322,16 +321,13 @@ function update()
             }
         }
         //NEW STUFF
-        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.sizeBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.weatherSizeBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, sizeData, gl.STATIC_DRAW);
 
         //Send the data to shader
         var attributeLoc = gl.getAttribLocation(pointProgram, 'aPointSize');
         gl.enableVertexAttribArray(attributeLoc);
         gl.vertexAttribPointer(attributeLoc, 1, gl.FLOAT, false, 0, 0);
-
-        //OLD THING
-        //gl.vertexAttrib1f(gl.aPointSize, 10 + 40 * );
 
         var mapMatrix = new Float32Array(16);
         mapMatrix.set(pixelsToWebGLMatrix);
@@ -347,15 +343,14 @@ function update()
         var matrixLoc = gl.getUniformLocation(pointProgram, 'mapMatrix');
         gl.uniformMatrix4fv(matrixLoc, false, mapMatrix);
 
-        console.debug("Drawing " + dataSource.length + " points");
-        gl.drawArrays(gl.POINTS, 0, dataSource.length);
+        //gl.drawArrays(gl.POINTS, 0, dataSource.weatherLength);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, glyphTexture);
         var samplerLoc = gl.getUniformLocation(pointProgram, 'sampler');
         gl.uniform1i(samplerLoc, 0);
 
-        gl.drawArrays(gl.POINTS, 0, dataSource.length);
+        gl.drawArrays(gl.POINTS, 0, dataSource.weatherLength);
 
         if (firstTime)
         {
