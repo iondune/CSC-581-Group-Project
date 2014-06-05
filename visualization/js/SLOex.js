@@ -33,12 +33,8 @@ var currentDataSource = -1;
 var dataEntries = 0; //Total number of entries in the data set
 var daysInMonth = 31;
 
-// Data range
-var dataMax = -Infinity;
-var dataMin = Infinity;
-
 // Number of data files to load
-var dataFiles = 1;
+var dataFiles = 2;
 var weatherDataToDraw = new Array();
 var rawWeatherData;
 var seismicDataToDraw = new Array();
@@ -48,8 +44,6 @@ var glyphWeatherImage;
 var glyphWeatherTexture;
 var glyphSeismicImage;
 var glyphSeismicTexture;
-
-
 
 function init()
 {
@@ -248,17 +242,13 @@ function loadDataSource(index)
             'seismicBuffer': gl.createBuffer(),
             'seismicSizeBuffer': gl.createBuffer()
         };
-        console.debug("Resolving " + index);
         data.resolve();
-        
     })
     return data;
 }
 
 function pickDataSource(index)
 {
-    console.debug("Picking data source " + index);
-
     weatherDataToDraw = [];
     seismicDataToDraw = [];
     //Go through all data to find which points are valid for the chosen day
@@ -266,14 +256,9 @@ function pickDataSource(index)
         if (dataValues[i].Day == index)
         {
             if(dataValues[i].isWeather == true)
-            {
                 weatherDataToDraw.push(dataValues[i]);
-            }
             else
-            {
-                console.debug("FOUND SEISMIC");
                 seismicDataToDraw.push(dataValues[i]);
-            }
         }
     }
 
@@ -287,7 +272,6 @@ function pickDataSource(index)
     }
 
     //Put the necessary seismic data into a buffer
-    console.debug("This day has " + seismicDataToDraw.length + " points");
     rawSeismicData = new Float32Array(3 * seismicDataToDraw.length);
     for(var i = 0; i < seismicDataToDraw.length; i++)
     {
@@ -329,8 +313,6 @@ function translateMatrix(matrix, tx, ty)
     matrix[15] += matrix[3]*tx + matrix[7]*ty;
 }
 
-var firstTime = true;
-
 function update()
 {
     canvasLayer.resizeMe();
@@ -354,8 +336,6 @@ function update()
         var sizeMin = Infinity;
         var sizeMax = -Infinity;
 
-        console.debug("Drawing " + $("#SeismicForm input[type='radio']:checked").val());
-
         for(var i = 0; i < seismicDataToDraw.length; i++)
         {
             if(seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()] != null)
@@ -366,6 +346,7 @@ function update()
                     sizeMin = seismicDataToDraw[i][$("#SeismicForm input[type='radio']:checked").val()];
             }
         }
+        sizeMax += .01;
         var sizeData = new Float32Array(seismicDataToDraw.length);
         for(var i = 0; i < seismicDataToDraw.length; i++)
         {
@@ -377,8 +358,7 @@ function update()
         //Send position data
         gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.seismicBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, rawSeismicData, gl.STATIC_DRAW);
-
-        console.debug("Drawing " + dataSource.seismicLength + " values");
+        
         var attributeLoc = gl.getAttribLocation(pointProgram, 'worldCoord');
         gl.enableVertexAttribArray(attributeLoc);
         gl.vertexAttribPointer(attributeLoc, 3, gl.FLOAT, false, 0, 0);
@@ -414,20 +394,12 @@ function update()
         gl.uniform1i(samplerLoc, 0);
 
         gl.drawArrays(gl.POINTS, 0, dataSource.seismicLength);
-
-        if (firstTime)
-        {
-            firstTime = false;
-            update();
-        }
     }
     if($("#WeatherForm input[type='radio']:checked").val() != "NoSelection")
     {
         var sizeMin = Infinity;
         var sizeMax = -Infinity;
         //Color represents temperature, size changes with value
-
-        console.debug("Drawing " + $("#WeatherForm input[type='radio']:checked").val());
 
         for(var i = 0; i < weatherDataToDraw.length; i++)
         {
@@ -439,13 +411,13 @@ function update()
                     sizeMin = weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()];
             }
         }
+
+        sizeMax += .01;
         var sizeData = new Float32Array(weatherDataToDraw.length);
         for(var i = 0; i < weatherDataToDraw.length; i++)
         {
             if(weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] != null)
-            {
                 sizeData[i] = ((weatherDataToDraw[i][$("#WeatherForm input[type='radio']:checked").val()] - sizeMin) / (sizeMax - sizeMin)) * 40 + 10;
-            }
         }
 
         //Send position data
@@ -459,7 +431,6 @@ function update()
         gl.bindBuffer(gl.ARRAY_BUFFER, dataSource.weatherSizeBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, sizeData, gl.STATIC_DRAW);
 
-    
         //Tell the shader it's drawing weather data
         gl.uniform1i(gl.getUniformLocation(pointProgram, 'weatherDraw'), 1);
 
@@ -487,12 +458,6 @@ function update()
         gl.uniform1i(samplerLoc, 0);
 
         gl.drawArrays(gl.POINTS, 0, dataSource.weatherLength);
-
-        if (firstTime)
-        {
-            firstTime = false;
-            update();
-        }
     }   
 }
 
