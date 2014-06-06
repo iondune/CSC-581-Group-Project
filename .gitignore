@@ -1,4 +1,5 @@
 *.sublime-workspace
 dataService/data_worker/.idea/
-*.pyc
 *.idea
+__pycache__/
+*.py[cod]
