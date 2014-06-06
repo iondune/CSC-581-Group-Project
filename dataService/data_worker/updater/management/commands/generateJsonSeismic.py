@@ -1,7 +1,7 @@
 from django.db.models import Q
 from django.db.models.query import QuerySet
 import geojson
-from updater.models import DailySummary
+from updater.models import DailySummary, Earthquake
 from updater.models import Station
 import datetime
 from django.core.management.base import BaseCommand
@@ -9,6 +9,7 @@ from django.db.transaction import commit_on_success
 from django.contrib.gis.geos import Polygon, GEOSGeometry
 from djgeojson.serializers import Serializer as GeoJSONSerializer
 from geojson import Feature, FeatureCollection, Point
+from pygeocoder import Geocoder
 
 class Command(BaseCommand):
     args = '<poll_id poll_id ...>'
@@ -24,34 +25,30 @@ def generateJson():
     # summaries = Station.objects.all().order_by('?')[:15]
     # summaries = DailySummary.objects.all()
 
-    summaries = DailySummary.objects.select_related('station')\
-        .exclude(station__isnull=True)\
-        .order_by('station').filter(Q(date__gte='2013-01-01') & Q(date__lte='2013-01-31'))[:310]
+    earthquakes = Earthquake.objects.all().exclude(location__isnull=True)
 
-    # summaries = sorted(summaries, key=lambda summ: summ.date)
-    # sorted(student_objects, key=lambda student: student.age)
-
-    for summary in summaries:
-        print '\n' + str(summary.station.usaf), str(summary.station.wban), str(summary.station.location)
-
-    dicts = summaries.values()
+    dicts = earthquakes.values()
     features = []
 
     # todo: optimize the querying here
-    for i in xrange(len(summaries)):
+    for i in xrange(len(earthquakes)):
         if i % 50 == 0 and i > 0:
-            print 'Processed', i, 'summaries into GeoJSON.'
+            print 'Processed', i, 'earthquakes into GeoJSON.'
 
-        location = summaries[i].station.location
+        location = earthquakes[i].location
         point = Point((location[0], location[1]))
+
         dict = dicts[i]
         dict['date'] = dict['date'].isoformat()
+
+        del dict['location']
+
         feature = Feature(geometry=point, properties=dict)
         features.append(feature)
 
     features = FeatureCollection(features)
 
-    file = open('weather.json', 'w')
+    file = open('seismic.json', 'w')
     geojson.dump(features, file, sort_keys=False)
     file.close()
 

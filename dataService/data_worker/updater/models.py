@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
 
-# Create your models here.
+
 class Station(models.Model):
 
     usaf = models.IntegerField(null=True)
@@ -16,6 +16,7 @@ class Station(models.Model):
 
     def __unicode__(self):
         return str(self.usaf)
+
 
 class DailySummary(models.Model):
     # related_name='+' prevents backward relation from being added to schema;
@@ -37,6 +38,20 @@ class DailySummary(models.Model):
     min_temperature = models.FloatField(null=True) # do not use in 581
     precipitation = models.FloatField(null=True)
     snow_depth = models.FloatField(null=True) # do not use in 581
+
+    objects = models.GeoManager()
+
+    def __unicode__(self):
+        return str(self.stn) + ' ' + str(self.wban) + ' ' + str(self.date)
+
+
+class Earthquake(models.Model):
+    magnitude = models.FloatField(null=True)
+    depth = models.FloatField(null=True)
+    significance = models.IntegerField(null=True)
+    affected_stations = models.IntegerField(null=True)
+    location = models.PointField(null=True)
+    date = models.DateField(null=True)
 
     objects = models.GeoManager()
 
